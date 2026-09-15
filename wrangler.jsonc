@@ -36,6 +36,14 @@
     },
     "live": {
       "name": "athlete-intelligence-live",
+      "d1_databases": [
+        {
+          "binding": "TRAINING_DB",
+          "database_name": "athlete-intelligence-training",
+          "database_id": "d8939b83-22b7-4321-8a74-28ee795aaf36",
+          "migrations_dir": "migrations"
+        }
+      ],
       "secrets": {
         "required": ["INTERVALS_API_KEY", "INTERVALS_ATHLETE_ID"]
       },
