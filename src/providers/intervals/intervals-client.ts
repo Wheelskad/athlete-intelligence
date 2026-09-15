@@ -157,7 +157,7 @@ export class IntervalsClient implements AthleteDataProvider {
     });
   }
 
-  async upsertManagedPlannedWorkouts(workouts: ManagedPlannedWorkout[]): Promise<number> {
+  async upsertManagedPlannedWorkouts(workouts: ManagedPlannedWorkout[]) {
     const athleteId = encodeURIComponent(this.options.athleteId);
     const url = new URL(`${INTERVALS_BASE_URL}/athlete/${athleteId}/events/bulk`);
     url.searchParams.set("upsert", "true");
@@ -182,7 +182,10 @@ export class IntervalsClient implements AthleteDataProvider {
     });
     const parsed = z.array(z.looseObject({ id: z.union([z.string(), z.number()]) })).safeParse(response);
     if (!parsed.success) throw this.invalidResponse();
-    return parsed.data.length;
+    return parsed.data.map((event, index) => ({
+      managedId: workouts[index]?.managedId ?? String(event.id),
+      intervalsExternalId: String(event.id),
+    }));
   }
 
   private assertRange(range: DateRange): void {

@@ -14,12 +14,12 @@ Une prévisualisation réclamable peut aussi être créée sans connexion préal
 
 ## Architecture déployable
 
-Le projet utilise `@cloudflare/workers-oauth-provider` comme serveur OAuth 2.1 et Cloudflare Access for SaaS comme fournisseur OIDC amont. Le namespace KV `athlete-intelligence-oauth` ne stocke aucune donnée sportive.
+Le projet utilise `@cloudflare/workers-oauth-provider` comme serveur OAuth 2.1 et Cloudflare Access for SaaS comme fournisseur OIDC amont. Le namespace KV `athlete-intelligence-oauth` ne stocke aucune donnée sportive. La base D1 `athlete-intelligence-training` conserve séparément les snapshots normalisés, décisions et séances gérées, sans credential fournisseur.
 
 Le Worker est le **resource server** MCP et :
 
 1. publie `/.well-known/oauth-protected-resource/mcp` avec son URL HTTPS canonique, le serveur d’autorisation et le scope `athlete:access` ;
-2. annonce ce scope dans les métadonnées de chacun des six outils ;
+2. annonce ce scope dans les métadonnées de chacun des dix outils ;
 3. retourne `401` avec `WWW-Authenticate: Bearer resource_metadata="…"` lorsque l’identité manque ou échoue ;
 4. retourne également `_meta["mcp/www_authenticate"]` dans les erreurs d’outil nécessitant la liaison OAuth ;
 5. vérifier à chaque requête la signature via JWKS, `iss`, `aud`/`resource`, `exp`, `nbf` et les scopes ;
@@ -37,15 +37,16 @@ Le serveur prend en charge Authorization Code + PKCE `S256`, CIMD et DCR de comp
 4. Ajouter une politique Allow limitée à l’identité de l’athlète.
 5. Copier Client ID, Client secret, Issuer, Token endpoint, Authorization endpoint et Key endpoint dans les secrets Worker correspondants.
 6. Ajouter `AUTHORIZED_EMAILS`, `COOKIE_ENCRYPTION_KEY`, `INTERVALS_API_KEY` et `INTERVALS_ATHLETE_ID` comme secrets.
-7. Déployer avec `npm run deploy:mcp`.
+7. Appliquer le schéma avec `npm run db:migrate:remote`.
+8. Déployer avec `npm run deploy:mcp`.
 
 Le hostname du Worker MCP ne doit pas recevoir une règle Cloudflare Access globale : cela empêcherait ChatGPT de lire les routes `/.well-known/*`. L’authentification est effectuée dans le protocole OAuth du Worker.
 
 ## Isolation et droits
 
-Le MVP est mono-athlète. Avant un usage multi-utilisateur, remplacer la configuration globale par une résolution sécurisée `subject OAuth → athleteId autorisé → credential provider`, avec isolation stricte. Un stockage devient alors probablement nécessaire, mais aucune donnée de santé ni réponse Intervals.icu ne doit être placée dans l’état de transport MCP.
+Le MVP est mono-athlète. Avant un usage multi-utilisateur, remplacer la configuration globale par une résolution sécurisée `subject OAuth → athleteId autorisé → credential provider`, avec isolation stricte. Aucune donnée de santé ni réponse Intervals.icu ne doit être placée dans l’état de transport MCP.
 
-Les quatre outils de consultation restent en lecture seule. Les deux écritures Intervals.icu sont limitées au check-in quotidien et aux séances explicitement confirmées. Les scopes OAuth MCP ne donnent jamais directement accès à la clé fournisseur.
+Les six outils de consultation sont sans effet sur Intervals.icu ; le contexte runtime ajoute seulement un snapshot d’audit immuable dans D1. Les écritures internes créent une proposition ou enregistrent son acceptation/refus. Les deux écritures Intervals.icu restent limitées au check-in quotidien et aux séances explicitement confirmées. Les scopes OAuth MCP ne donnent jamais directement accès à la clé fournisseur.
 
 ## Validation avant ouverture
 

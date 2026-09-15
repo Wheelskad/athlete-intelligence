@@ -3,6 +3,8 @@ DATA_SOURCE=fixtures
 DEFAULT_TIMEZONE=Europe/Paris
 MAX_HISTORY_DAYS=42
 NODE_ENV=development
+ATHLETE_ID=primary
+# ATHLETE_PROFILE_JSON={"goals":[],"preferences":{"maxSessionsPerWeek":4}}
 
 # Required only when DATA_SOURCE=intervals.icu
 # INTERVALS_ATHLETE_ID=0

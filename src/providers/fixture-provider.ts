@@ -41,7 +41,7 @@ export class FixtureProvider implements AthleteDataProvider {
     return Promise.resolve();
   }
 
-  upsertManagedPlannedWorkouts(workouts: ManagedPlannedWorkout[]): Promise<number> {
+  upsertManagedPlannedWorkouts(workouts: ManagedPlannedWorkout[]) {
     for (const workout of workouts) {
       const event = {
         date: workout.date,
@@ -58,6 +58,11 @@ export class FixtureProvider implements AthleteDataProvider {
       if (index === -1) this.data.events.push(event);
       else this.data.events[index] = event;
     }
-    return Promise.resolve(workouts.length);
+    return Promise.resolve(
+      workouts.map((workout) => ({
+        managedId: workout.managedId,
+        intervalsExternalId: `fixture:${workout.managedId}`,
+      })),
+    );
   }
 }

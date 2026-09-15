@@ -8,6 +8,8 @@ const envSchema = z
     DATA_SOURCE: z.enum(["intervals", "fixtures"]).default("fixtures"),
     MAX_HISTORY_DAYS: z.coerce.number().int().min(1).max(90).default(42),
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+    ATHLETE_ID: z.string().trim().min(1).max(120).default("primary"),
+    ATHLETE_PROFILE_JSON: z.string().min(2).optional(),
   })
   .superRefine((value, context) => {
     if (value.DATA_SOURCE !== "intervals") return;
@@ -34,6 +36,9 @@ export interface WorkerEnv {
   DATA_SOURCE?: string;
   MAX_HISTORY_DAYS?: string;
   NODE_ENV?: string;
+  ATHLETE_ID?: string;
+  ATHLETE_PROFILE_JSON?: string;
+  TRAINING_DB?: D1Database;
 }
 
 export type AppConfig = z.infer<typeof envSchema>;

@@ -16,7 +16,9 @@
     "deploy:demo": "wrangler deploy --env demo",
     "deploy:live": "wrangler deploy --env live",
     "deploy:temporary": "wrangler deploy --env demo --temporary",
-    "deploy:mcp": "wrangler deploy --config wrangler.mcp.jsonc"
+    "deploy:mcp": "wrangler deploy --config wrangler.mcp.jsonc",
+    "db:migrate:local": "wrangler d1 migrations apply TRAINING_DB --local --config wrangler.mcp.jsonc",
+    "db:migrate:remote": "wrangler d1 migrations apply TRAINING_DB --remote --config wrangler.mcp.jsonc"
   },
   "dependencies": {
     "@cloudflare/workers-oauth-provider": "^0.10.3",

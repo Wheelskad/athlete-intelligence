@@ -11,6 +11,11 @@ import { createAthleteDataServer } from "./mcp/server";
 import { sanitizeTrainingContext } from "./privacy/sanitize";
 import { createProvider } from "./providers/create-provider";
 import { IntervalsProviderError } from "./providers/intervals/intervals-client";
+import { createAthleteContext } from "./application/create-athlete-context";
+import { createD1TrainingMemory } from "./persistence/d1-training-memory";
+import { createInMemoryTrainingMemory } from "./persistence/in-memory-training-memory";
+
+const developmentMemory = createInMemoryTrainingMemory();
 
 function productionAuthPending(): Response {
   return Response.json(
@@ -141,6 +146,10 @@ export default {
             timezone: config.DEFAULT_TIMEZONE,
             maxHistoryDays: config.MAX_HISTORY_DAYS,
           },
+          athlete: createAthleteContext(config),
+          memory: env.TRAINING_DB === undefined
+            ? developmentMemory
+            : createD1TrainingMemory(env.TRAINING_DB),
         }),
       { route: "/mcp", corsOptions: false },
     );

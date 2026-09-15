@@ -129,6 +129,18 @@ export async function getRecoverySummary(
   }
 
   const latestRecoveryDate = current.map((record) => record.date).sort().at(-1);
+  const latestSleepRecord = [...current]
+    .filter((record) => record.sleepDurationMinutes !== undefined || record.sleepScore !== undefined)
+    .sort((left, right) => left.date.localeCompare(right.date))
+    .at(-1);
+  const latestRhrRecord = [...current]
+    .filter((record) => record.restingHeartRate !== undefined)
+    .sort((left, right) => left.date.localeCompare(right.date))
+    .at(-1);
+  const latestHrvRecord = [...current]
+    .filter((record) => record.hrv !== undefined)
+    .sort((left, right) => left.date.localeCompare(right.date))
+    .at(-1);
   const currentLoadRecords = current
     .filter((record) => record.fitnessLoad !== undefined && record.fatigueLoad !== undefined)
     .sort((left, right) => left.date.localeCompare(right.date));
@@ -222,11 +234,16 @@ export async function getRecoverySummary(
     number | undefined,
     (value: number) => void,
   ][] = [
+    [latestSleepRecord?.sleepDurationMinutes, (value) => { result.sleep.latestDurationMinutes = round(value, 1); }],
     [roundedAverage(current, (item) => item.sleepDurationMinutes), (value) => { result.sleep.averageDurationMinutes = value; }],
+    [latestSleepRecord?.sleepScore, (value) => { result.sleep.latestScore = round(value, 1); }],
     [roundedAverage(current, (item) => item.sleepScore), (value) => { result.sleep.averageScore = value; }],
+    [latestRhrRecord?.restingHeartRate, (value) => { result.restingHeartRate.latest = round(value, 1); }],
     [currentRhr === undefined ? undefined : round(currentRhr, 1), (value) => { result.restingHeartRate.average = value; }],
     [baselineRhr === undefined ? undefined : round(baselineRhr, 1), (value) => { result.restingHeartRate.baseline = value; }],
     [currentRhr === undefined || baselineRhr === undefined ? undefined : round(currentRhr - baselineRhr, 1), (value) => { result.restingHeartRate.delta = value; }],
+    [latestRhrRecord?.restingHeartRate === undefined || baselineRhr === undefined || baselineRhr === 0 ? undefined : round(((latestRhrRecord.restingHeartRate - baselineRhr) / Math.abs(baselineRhr)) * 100, 1), (value) => { result.restingHeartRate.deltaPercent = value; }],
+    [latestHrvRecord?.hrv, (value) => { result.hrv.latest = round(value, 1); }],
     [currentHrv === undefined ? undefined : round(currentHrv, 1), (value) => { result.hrv.average = value; }],
     [baselineHrv === undefined ? undefined : round(baselineHrv, 1), (value) => { result.hrv.baseline = value; }],
     [currentHrv === undefined || baselineHrv === undefined || baselineHrv === 0 ? undefined : round(((currentHrv - baselineHrv) / Math.abs(baselineHrv)) * 100, 1), (value) => { result.hrv.deltaPercent = value; }],

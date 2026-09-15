@@ -6,15 +6,22 @@ import { getTrainingContext } from "../application/get-training-context";
 import { sanitizeTrainingContext } from "../privacy/sanitize";
 import { FixtureProvider } from "../providers/fixture-provider";
 import { createAthleteDataServer, TOOL_DEFINITIONS } from "./server";
+import { createInMemoryTrainingMemory } from "../persistence/in-memory-training-memory";
+
+const athlete = { athleteId: "test-athlete", goals: [], preferences: {} };
 
 describe("MCP contract", () => {
-  it("declares four read tools and two explicitly state-changing tools", async () => {
-    expect(TOOL_DEFINITIONS).toHaveLength(6);
+  it("declares runtime memory tools alongside the existing connector tools", async () => {
+    expect(TOOL_DEFINITIONS).toHaveLength(10);
     expect(TOOL_DEFINITIONS.map((tool) => tool.name)).toEqual([
       "get_week_summary",
       "get_recovery_summary",
       "get_training_context",
       "get_performance_metrics",
+      "get_training_runtime_context",
+      "get_training_decision_history",
+      "save_training_decision",
+      "update_training_decision_status",
       "record_daily_check_in",
       "publish_training_plan",
     ]);
@@ -23,6 +30,10 @@ describe("MCP contract", () => {
       { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
       { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
       { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+      { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+      { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+      { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+      { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
       { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
       { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
     ]);
@@ -30,6 +41,8 @@ describe("MCP contract", () => {
     const server = createAthleteDataServer({
       provider: FixtureProvider.anchoredAt("2026-09-14"),
       options: { timezone: "Europe/Paris", maxHistoryDays: 42 },
+      athlete,
+      memory: createInMemoryTrainingMemory(),
     });
     const client = new Client({ name: "contract-test", version: "1.0.0" });
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -61,6 +74,8 @@ describe("MCP contract", () => {
         maxHistoryDays: 42,
         now: () => new Date("2026-09-14T07:30:00Z"),
       },
+      athlete,
+      memory: createInMemoryTrainingMemory(),
     });
     const client = new Client({ name: "performance-test", version: "1.0.0" });
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();

@@ -47,17 +47,22 @@ export interface RecoverySummary {
   availableDays: number;
   freshness: { latestRecoveryDate?: string };
   sleep: {
+    latestDurationMinutes?: number;
     averageDurationMinutes?: number;
+    latestScore?: number;
     averageScore?: number;
     trend: Trend;
   };
   restingHeartRate: {
+    latest?: number;
     average?: number;
     baseline?: number;
     delta?: number;
+    deltaPercent?: number;
     trend: Trend;
   };
   hrv: {
+    latest?: number;
     average?: number;
     baseline?: number;
     deltaPercent?: number;

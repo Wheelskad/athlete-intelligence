@@ -11,11 +11,20 @@
       "id": "96ded51c13b542e498f305469ee2899f"
     }
   ],
+  "d1_databases": [
+    {
+      "binding": "TRAINING_DB",
+      "database_name": "athlete-intelligence-training",
+      "database_id": "d8939b83-22b7-4321-8a74-28ee795aaf36",
+      "migrations_dir": "migrations"
+    }
+  ],
   "vars": {
     "DATA_SOURCE": "intervals",
     "DEFAULT_TIMEZONE": "Europe/Paris",
     "MAX_HISTORY_DAYS": "42",
-    "NODE_ENV": "production"
+    "NODE_ENV": "production",
+    "ATHLETE_ID": "primary"
   },
   "secrets": {
     "required": [

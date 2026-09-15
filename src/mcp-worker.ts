@@ -5,6 +5,8 @@ import { createAthleteDataServer } from "./mcp/server";
 import { ATHLETE_ACCESS_SCOPE } from "./mcp/security";
 import { accessOAuthHandler, type AccessOAuthEnv } from "./oauth/access-auth";
 import { createProvider } from "./providers/create-provider";
+import { createAthleteContext } from "./application/create-athlete-context";
+import { createD1TrainingMemory } from "./persistence/d1-training-memory";
 
 interface OAuthProps {
   subject: string;
@@ -16,6 +18,7 @@ interface OAuthProps {
 export interface McpWorkerEnv extends WorkerEnv, AccessOAuthEnv {
   OAUTH_KV: KVNamespace;
   OAUTH_PROVIDER: OAuthHelpers;
+  TRAINING_DB: D1Database;
 }
 
 const apiHandler = {
@@ -38,6 +41,8 @@ const apiHandler = {
             timezone: config.DEFAULT_TIMEZONE,
             maxHistoryDays: config.MAX_HISTORY_DAYS,
           },
+          athlete: createAthleteContext(config),
+          memory: createD1TrainingMemory(env.TRAINING_DB),
         }),
       { route: "/mcp", corsOptions: false },
     );

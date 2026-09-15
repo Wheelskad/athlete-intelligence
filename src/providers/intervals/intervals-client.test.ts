@@ -99,7 +99,7 @@ describe("IntervalsClient controlled writes", () => {
           trainingLoad: 35,
         },
       ]),
-    ).resolves.toBe(1);
+    ).resolves.toEqual([{ managedId: "week1-easy-run", intervalsExternalId: "123" }]);
     const [input, init] = fetchImpl.mock.calls[0] ?? [];
     if (!(input instanceof URL)) throw new Error("Expected URL input");
     if (typeof init?.body !== "string") throw new Error("Expected JSON body");

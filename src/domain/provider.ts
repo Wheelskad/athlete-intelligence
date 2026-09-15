@@ -16,10 +16,15 @@ export interface ActivityFetchResult {
   unavailableActivityCount: number;
 }
 
+export interface PublishedPlannedWorkout {
+  managedId: string;
+  intervalsExternalId?: string;
+}
+
 export interface AthleteDataProvider {
   getActivities(range: DateRange): Promise<ActivityFetchResult>;
   getRecovery(range: DateRange): Promise<DailyRecovery[]>;
   getPlannedEvents(range: DateRange): Promise<PlannedEvent[]>;
   recordDailyCheckIn(date: string, update: DailyCheckInUpdate): Promise<void>;
-  upsertManagedPlannedWorkouts(workouts: ManagedPlannedWorkout[]): Promise<number>;
+  upsertManagedPlannedWorkouts(workouts: ManagedPlannedWorkout[]): Promise<PublishedPlannedWorkout[]>;
 }

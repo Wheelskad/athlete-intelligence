@@ -5,7 +5,7 @@ import type { ConsolidatedTrainingMetrics, RollingPeriodMetrics } from "../domai
 
 export type SafeActivity = Omit<ActivitySummary, "id">;
 
-function sanitizeActivity(activity: ActivitySummary): SafeActivity {
+export function sanitizeActivity(activity: ActivitySummary): SafeActivity {
   return {
     date: activity.date,
     sport: activity.sport,
@@ -132,15 +132,22 @@ export function sanitizeRecoverySummary(summary: RecoverySummary): object {
         : { latestRecoveryDate: summary.freshness.latestRecoveryDate }),
     },
     sleep: {
+      ...(summary.sleep.latestDurationMinutes === undefined
+        ? {}
+        : { latestDurationMinutes: summary.sleep.latestDurationMinutes }),
       ...(summary.sleep.averageDurationMinutes === undefined
         ? {}
         : { averageDurationMinutes: summary.sleep.averageDurationMinutes }),
       ...(summary.sleep.averageScore === undefined
         ? {}
         : { averageScore: summary.sleep.averageScore }),
+      ...(summary.sleep.latestScore === undefined ? {} : { latestScore: summary.sleep.latestScore }),
       trend: summary.sleep.trend,
     },
     restingHeartRate: {
+      ...(summary.restingHeartRate.latest === undefined
+        ? {}
+        : { latest: summary.restingHeartRate.latest }),
       ...(summary.restingHeartRate.average === undefined
         ? {}
         : { average: summary.restingHeartRate.average }),
@@ -150,9 +157,13 @@ export function sanitizeRecoverySummary(summary: RecoverySummary): object {
       ...(summary.restingHeartRate.delta === undefined
         ? {}
         : { delta: summary.restingHeartRate.delta }),
+      ...(summary.restingHeartRate.deltaPercent === undefined
+        ? {}
+        : { deltaPercent: summary.restingHeartRate.deltaPercent }),
       trend: summary.restingHeartRate.trend,
     },
     hrv: {
+      ...(summary.hrv.latest === undefined ? {} : { latest: summary.hrv.latest }),
       ...(summary.hrv.average === undefined ? {} : { average: summary.hrv.average }),
       ...(summary.hrv.baseline === undefined ? {} : { baseline: summary.hrv.baseline }),
       ...(summary.hrv.deltaPercent === undefined
