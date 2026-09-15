@@ -1,0 +1,90 @@
+import { describe, expect, it } from "vitest";
+import { Client } from "@modelcontextprotocol/client";
+import { InMemoryTransport } from "@modelcontextprotocol/server";
+import { getTrainingContext } from "../application/get-training-context";
+import { sanitizeTrainingContext } from "../privacy/sanitize";
+import { FixtureProvider } from "../providers/fixture-provider";
+import { createAthleteDataServer, TOOL_DEFINITIONS } from "./server";
+
+describe("MCP contract", () => {
+  it("declares three read tools and two explicitly state-changing tools", async () => {
+    expect(TOOL_DEFINITIONS).toHaveLength(5);
+    expect(TOOL_DEFINITIONS.map((tool) => tool.name)).toEqual([
+      "get_week_summary",
+      "get_recovery_summary",
+      "get_training_context",
+      "record_daily_check_in",
+      "publish_training_plan",
+    ]);
+    expect(TOOL_DEFINITIONS.map((tool) => tool.annotations)).toEqual([
+      { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+      { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+      { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+      { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+      { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+    ]);
+
+    const server = createAthleteDataServer({
+      provider: FixtureProvider.anchoredAt("2026-09-14"),
+      options: { timezone: "Europe/Paris", maxHistoryDays: 42 },
+    });
+    const client = new Client({ name: "contract-test", version: "1.0.0" });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+    try {
+      const listed = await client.listTools();
+      expect(
+        listed.tools.map((tool) => ({ name: tool.name, annotations: tool.annotations })),
+      ).toEqual(TOOL_DEFINITIONS);
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it("keeps a stable get_training_context output contract", async () => {
+    const output = sanitizeTrainingContext(
+      await getTrainingContext(
+        FixtureProvider.anchoredAt("2026-09-14"),
+        { historyDays: 14, includeUpcomingCalendar: true },
+        { timezone: "Europe/Paris", maxHistoryDays: 42, now: () => new Date("2026-09-14T07:30:00Z") },
+      ),
+    ) as Record<string, unknown>;
+    expect({
+      topLevelKeys: Object.keys(output),
+      missingMetrics: output.missingMetrics,
+      dataQuality: output.dataQuality,
+      upcomingCalendar: output.upcomingCalendar,
+    }).toEqual({
+      topLevelKeys: [
+        "generatedAt",
+        "timezone",
+        "period",
+        "freshness",
+        "activities",
+        "recovery",
+        "performance",
+        "upcomingCalendar",
+        "dataQuality",
+        "missingMetrics",
+      ],
+      missingMetrics: [
+        "trainingReadiness",
+        "garminRecoveryTime",
+        "trainingStatus",
+        "acuteLoadFocus",
+        "enduranceScore",
+      ],
+      dataQuality: { score: 1, label: "good" },
+      upcomingCalendar: {
+        period: { startDate: "2026-09-15", endDate: "2026-10-12" },
+        available: true,
+        events: [
+          { date: "2026-09-16", category: "WORKOUT", sport: "cycling", durationMinutes: 90, trainingLoad: 70 },
+          { date: "2026-09-18", category: "WORKOUT", sport: "running", durationMinutes: 45, trainingLoad: 48 },
+        ],
+      },
+    });
+  });
+});

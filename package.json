@@ -1,0 +1,36 @@
+{
+  "name": "athlete-data-connector",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Privacy-first MCP server and dashboard for normalized athlete training and recovery context.",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "build": "wrangler deploy --dry-run --outdir dist --env=\"\"",
+    "deploy:demo": "wrangler deploy --env demo",
+    "deploy:temporary": "wrangler deploy --env demo --temporary"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.0.0",
+    "agents": "^0.23.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260914.1",
+    "@eslint/js": "^10.0.0",
+    "@modelcontextprotocol/client": "^2.0.0",
+    "@vitest/coverage-v8": "^5.0.0",
+    "eslint": "^10.10.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.70.0",
+    "vitest": "^5.0.0",
+    "wrangler": "^4.131.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

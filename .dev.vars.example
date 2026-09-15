@@ -1,0 +1,9 @@
+# Copy to .dev.vars (never commit .dev.vars).
+DATA_SOURCE=fixtures
+DEFAULT_TIMEZONE=Europe/Paris
+MAX_HISTORY_DAYS=42
+NODE_ENV=development
+
+# Required only when DATA_SOURCE=intervals.icu
+# INTERVALS_ATHLETE_ID=0
+# INTERVALS_API_KEY=replace-locally

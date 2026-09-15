@@ -1,0 +1,27 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "athlete-data-connector",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-12",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "DATA_SOURCE": "fixtures",
+    "DEFAULT_TIMEZONE": "Europe/Paris",
+    "MAX_HISTORY_DAYS": "42",
+    "NODE_ENV": "development"
+  },
+  "observability": {
+    "enabled": false
+  },
+  "env": {
+    "demo": {
+      "name": "athlete-data-connector-demo",
+      "vars": {
+        "DATA_SOURCE": "fixtures",
+        "DEFAULT_TIMEZONE": "Europe/Paris",
+        "MAX_HISTORY_DAYS": "42",
+        "NODE_ENV": "development"
+      }
+    }
+  }
+}
