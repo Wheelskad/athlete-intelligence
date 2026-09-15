@@ -144,6 +144,11 @@ export class TrainingRuntimeService {
   async getWorkoutDetail(managedId: string) {
     const managed = await this.memory.managedWorkouts.findByManagedId(this.athleteId, managedId);
     if (managed === undefined) throw new RangeError("Managed workout not found");
+    const writeAudits = await this.memory.intervalsWriteAudits.findRecentForManagedId(
+      this.athleteId,
+      managedId,
+      10,
+    );
     const event = managed.currentDate === undefined
       ? undefined
       : await this.contextService.getManagedPlannedWorkout(managedId, managed.currentDate);
@@ -163,6 +168,17 @@ export class TrainingRuntimeService {
       source: "ATHLETE_INTELLIGENCE" as const,
       blocks: managed.blocks ?? parseIntervalsWorkout(description),
       publicationVerification: managed.publicationVerification,
+      writeAudit: writeAudits.map((audit) => ({
+        managedId: audit.managedId,
+        operation: audit.operation,
+        durationSentMinutes: audit.durationSentMinutes,
+        parsedDurationMinutes: audit.parsedDurationMinutes,
+        caller: audit.caller,
+        timestamp: audit.timestamp,
+        outcome: audit.outcome,
+        ...(audit.warningCode === undefined ? {} : { warningCode: audit.warningCode }),
+        ...(audit.decisionId === undefined ? {} : { decisionId: audit.decisionId }),
+      })),
     };
   }
 

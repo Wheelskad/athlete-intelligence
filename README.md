@@ -153,6 +153,8 @@ Les blocs structurés de `publish_training_plan` sont sérialisés au format nat
 
 Après l'écriture, le connecteur relit l'événement et compare sa durée `workout_doc` à la durée attendue avec une tolérance d'une minute. Le résultat contient `verified`, `parsedDurationMinutes` et `durationDeltaMinutes`. En cas de `WORKOUT_DURATION_MISMATCH` ou de durée indisponible, la décision reste `ACCEPTED`, la vérification est persistée et elle ne passe pas silencieusement à `PUBLISHED`.
 
+Chaque appel MCP à `publish_training_plan` produit également une entrée immuable dans `intervals_write_audit` : `managedId`, opération `CREATE` ou `UPDATE`, durée envoyée, durée analysée après relecture, appelant, horodatage, résultat et éventuel `decisionId`. Les dix dernières écritures associées à une séance sont visibles dans `get_workout_detail.writeAudit`. Cela permet d'identifier une écriture ultérieure sans dépendre des logs éphémères du Worker.
+
 Cycle de décision :
 
 ```text

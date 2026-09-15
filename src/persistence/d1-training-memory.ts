@@ -1,6 +1,7 @@
 import {
   assertDecisionTransition,
   type ManagedWorkoutRepository,
+  type IntervalsWriteAuditRepository,
   type PreWorkoutFeedbackRepository,
   type PublishedManagedWorkout,
   type TrainingContextRepository,
@@ -9,6 +10,8 @@ import {
 } from "../application/training-memory";
 import type {
   DecisionStatus,
+  IntervalsWriteAudit,
+  IntervalsWriteAuditDraft,
   ManagedWorkout,
   PreWorkoutFeedback,
   PreWorkoutFeedbackDraft,
@@ -96,6 +99,21 @@ interface PreWorkoutFeedbackRow {
   time_available_minutes: number | null;
   preferred_sport: string | null;
   message: string | null;
+}
+
+interface IntervalsWriteAuditRow {
+  id: string;
+  athlete_id: string;
+  managed_id: string;
+  operation: IntervalsWriteAudit["operation"];
+  caller: IntervalsWriteAudit["caller"];
+  timestamp: string;
+  duration_sent_minutes: number | null;
+  parsed_duration_minutes: number | null;
+  decision_id: string | null;
+  intervals_external_id: string | null;
+  outcome: IntervalsWriteAudit["outcome"];
+  warning_code: NonNullable<IntervalsWriteAudit["warningCode"]> | null;
 }
 
 function parseJson(value: string): unknown {
@@ -371,6 +389,64 @@ export class D1PreWorkoutFeedbackRepository implements PreWorkoutFeedbackReposit
   }
 }
 
+function writeAuditFromRow(row: IntervalsWriteAuditRow): IntervalsWriteAudit {
+  return {
+    id: row.id,
+    athleteId: row.athlete_id,
+    managedId: row.managed_id,
+    operation: row.operation,
+    caller: row.caller,
+    timestamp: row.timestamp,
+    ...(row.duration_sent_minutes === null ? {} : { durationSentMinutes: row.duration_sent_minutes }),
+    ...(row.parsed_duration_minutes === null ? {} : { parsedDurationMinutes: row.parsed_duration_minutes }),
+    ...(row.decision_id === null ? {} : { decisionId: row.decision_id }),
+    ...(row.intervals_external_id === null ? {} : { intervalsExternalId: row.intervals_external_id }),
+    outcome: row.outcome,
+    ...(row.warning_code === null ? {} : { warningCode: row.warning_code }),
+  };
+}
+
+export class D1IntervalsWriteAuditRepository implements IntervalsWriteAuditRepository {
+  constructor(private readonly db: D1Database) {}
+
+  async create(athleteId: string, draft: IntervalsWriteAuditDraft): Promise<IntervalsWriteAudit> {
+    const audit: IntervalsWriteAudit = {
+      id: crypto.randomUUID(),
+      athleteId,
+      timestamp: new Date().toISOString(),
+      ...draft,
+    };
+    await this.db.prepare(
+      `INSERT INTO intervals_write_audit (
+        id, athlete_id, managed_id, operation, caller, timestamp,
+        duration_sent_minutes, parsed_duration_minutes, decision_id,
+        intervals_external_id, outcome, warning_code
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      audit.id,
+      audit.athleteId,
+      audit.managedId,
+      audit.operation,
+      audit.caller,
+      audit.timestamp,
+      audit.durationSentMinutes ?? null,
+      audit.parsedDurationMinutes ?? null,
+      audit.decisionId ?? null,
+      audit.intervalsExternalId ?? null,
+      audit.outcome,
+      audit.warningCode ?? null,
+    ).run();
+    return audit;
+  }
+
+  async findRecentForManagedId(athleteId: string, managedId: string, limit: number): Promise<IntervalsWriteAudit[]> {
+    const result = await this.db.prepare(
+      "SELECT * FROM intervals_write_audit WHERE athlete_id = ? AND managed_id = ? ORDER BY timestamp DESC LIMIT ?",
+    ).bind(athleteId, managedId, limit).all<IntervalsWriteAuditRow>();
+    return result.results.map(writeAuditFromRow);
+  }
+}
+
 export function createD1TrainingMemory(db: D1Database): TrainingMemoryServices {
   const contexts = new D1TrainingContextRepository(db);
   return {
@@ -378,5 +454,6 @@ export function createD1TrainingMemory(db: D1Database): TrainingMemoryServices {
     decisions: new D1TrainingDecisionRepository(db, contexts),
     managedWorkouts: new D1ManagedWorkoutRepository(db),
     preWorkoutFeedback: new D1PreWorkoutFeedbackRepository(db),
+    intervalsWriteAudits: new D1IntervalsWriteAuditRepository(db),
   };
 }

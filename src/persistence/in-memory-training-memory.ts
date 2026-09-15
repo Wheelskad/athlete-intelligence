@@ -6,6 +6,7 @@ import {
 import type {
   DecisionStatus,
   ManagedWorkout,
+  IntervalsWriteAudit,
   PreWorkoutFeedback,
   TrainingContextSnapshot,
   TrainingDecision,
@@ -17,6 +18,7 @@ export function createInMemoryTrainingMemory(): TrainingMemoryServices {
   const decisions = new Map<string, TrainingDecision>();
   const managedWorkouts = new Map<string, ManagedWorkout>();
   const feedback = new Map<string, PreWorkoutFeedback>();
+  const writeAudits = new Map<string, IntervalsWriteAudit>();
 
   return {
     contexts: {
@@ -131,6 +133,27 @@ export function createInMemoryTrainingMemory(): TrainingMemoryServices {
           .filter((item) => item.athleteId === athleteId && (managedId === undefined || item.managedId === managedId))
           .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
         return Promise.resolve(saved === undefined ? undefined : structuredClone(saved));
+      },
+    },
+    intervalsWriteAudits: {
+      create(athleteId, draft) {
+        const saved: IntervalsWriteAudit = {
+          id: crypto.randomUUID(),
+          athleteId,
+          timestamp: new Date().toISOString(),
+          ...structuredClone(draft),
+        };
+        writeAudits.set(saved.id, saved);
+        return Promise.resolve(structuredClone(saved));
+      },
+      findRecentForManagedId(athleteId, managedId, limit) {
+        return Promise.resolve(
+          [...writeAudits.values()]
+            .filter((item) => item.athleteId === athleteId && item.managedId === managedId)
+            .sort((left, right) => right.timestamp.localeCompare(left.timestamp))
+            .slice(0, limit)
+            .map((item) => structuredClone(item)),
+        );
       },
     },
   };

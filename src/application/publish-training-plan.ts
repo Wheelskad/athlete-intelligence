@@ -8,7 +8,7 @@ import { serializeIntervalsWorkout, workoutDurationSeconds } from "../domain/wor
 
 export interface PublicationTracking {
   athleteId: string;
-  decisionId: string;
+  decisionId?: string;
   memory: TrainingMemoryServices;
 }
 
@@ -95,10 +95,10 @@ export async function publishTrainingPlan(
       throw new RangeError(`Workout dates must be between ${today} and ${latestAllowedDate}`);
     }
   }
-  const decision = tracking === undefined
+  const decision = tracking?.decisionId === undefined
     ? undefined
     : await tracking.memory.decisions.findById(tracking.decisionId, tracking.athleteId);
-  if (tracking !== undefined) {
+  if (tracking?.decisionId !== undefined) {
     if (decision === undefined) throw new RangeError("Training decision not found");
     if (decision.status !== "ACCEPTED") throw new RangeError("Training decision must be ACCEPTED before publication");
     if (decision.managedId === undefined || !workouts.some((workout) => workout.managedId === decision.managedId)) {
@@ -122,6 +122,16 @@ export async function publishTrainingPlan(
       || (proposal.expectedTrainingLoad !== undefined && accepted.trainingLoad !== proposal.expectedTrainingLoad);
     if (differs) throw new RangeError("Published workout must exactly match the accepted proposal");
   }
+  const previousWrites = tracking === undefined
+    ? []
+    : await Promise.all(normalized.map(async (workout) => ({
+        managed: await tracking.memory.managedWorkouts.findByManagedId(tracking.athleteId, workout.managedId),
+        audits: await tracking.memory.intervalsWriteAudits.findRecentForManagedId(
+          tracking.athleteId,
+          workout.managedId,
+          1,
+        ),
+      })));
   const published = await provider.upsertManagedPlannedWorkouts(normalized);
   const results = await Promise.all(normalized.map(async (workout) => {
     const readBack = await provider.getManagedPlannedWorkout(workout.managedId, workout.date);
@@ -129,6 +139,23 @@ export async function publishTrainingPlan(
     return { managedId: workout.managedId, date: workout.date, sport: workout.sport, ...verification };
   }));
   const verified = results.every((result) => result.verified);
+  if (tracking !== undefined) {
+    await Promise.all(results.map((result, index) => {
+      const publishedWorkout = published.find((workout) => workout.managedId === result.managedId);
+      const previous = previousWrites[index];
+      return tracking.memory.intervalsWriteAudits.create(tracking.athleteId, {
+        managedId: result.managedId,
+        operation: previous?.managed !== undefined || (previous?.audits.length ?? 0) > 0 ? "UPDATE" : "CREATE",
+        caller: "publish_training_plan",
+        ...(result.expectedDurationMinutes === undefined ? {} : { durationSentMinutes: result.expectedDurationMinutes }),
+        ...(result.parsedDurationMinutes === undefined ? {} : { parsedDurationMinutes: result.parsedDurationMinutes }),
+        ...(tracking.decisionId === undefined ? {} : { decisionId: tracking.decisionId }),
+        ...(publishedWorkout?.intervalsExternalId === undefined ? {} : { intervalsExternalId: publishedWorkout.intervalsExternalId }),
+        outcome: result.verified ? "VERIFIED" : "VERIFICATION_FAILED",
+        ...(result.warning?.code === undefined ? {} : { warningCode: result.warning.code }),
+      });
+    }));
+  }
   const proposedWorkout = decision?.proposedWorkout;
   if (tracking !== undefined && decision !== undefined && proposedWorkout !== undefined) {
     await tracking.memory.managedWorkouts.upsertPublished(

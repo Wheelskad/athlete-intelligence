@@ -7,6 +7,7 @@ export default tseslint.config(
       "eslint.config.js",
       ".wrangler/**",
       "dist/**",
+      "dist-live/**",
       "dist-mcp/**",
       "coverage/**",
       "node_modules/**",

@@ -4,7 +4,7 @@ import { createInMemoryTrainingMemory } from "../persistence/in-memory-training-
 import { TrainingContextService } from "./training-context-service";
 import { TrainingRuntimeService } from "./training-runtime-service";
 import { recordPreWorkoutFeedback } from "./record-pre-workout-feedback";
-import { verifyWorkoutDuration } from "./publish-training-plan";
+import { publishTrainingPlan, verifyWorkoutDuration } from "./publish-training-plan";
 import { buildFixtureData } from "../test/fixtures/fixture-data";
 
 const now = () => new Date("2026-09-14T07:30:00.000Z");
@@ -31,6 +31,36 @@ describe("publication verification", () => {
         parsedDurationMinutes: 31,
       },
     });
+  });
+
+  it("audits every MCP publication with sent and parsed durations", async () => {
+    const provider = FixtureProvider.anchoredAt("2026-09-14");
+    const memory = createInMemoryTrainingMemory();
+    const workout = {
+      managedId: "audited-workout",
+      date: "2026-09-16",
+      sport: "indoor_cycling" as const,
+      title: "Audited workout",
+      description: "- 55m endurance",
+      durationMinutes: 55,
+    };
+    await publishTrainingPlan(provider, [workout], options, { athleteId: athlete.athleteId, memory });
+    await publishTrainingPlan(provider, [workout], options, { athleteId: athlete.athleteId, memory });
+    const audits = await memory.intervalsWriteAudits.findRecentForManagedId(
+      athlete.athleteId,
+      workout.managedId,
+      10,
+    );
+    expect(audits).toHaveLength(2);
+    expect(audits.map((audit) => audit.operation).sort()).toEqual(["CREATE", "UPDATE"]);
+    expect(audits[0]).toMatchObject({
+      managedId: workout.managedId,
+      caller: "publish_training_plan",
+      durationSentMinutes: 55,
+      parsedDurationMinutes: 55,
+      outcome: "VERIFIED",
+    });
+    expect(audits[0]?.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 });
 

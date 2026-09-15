@@ -61,9 +61,11 @@ export function registerPublishTrainingPlanTool(
           provider,
           input.workouts,
           options,
-          input.decisionId === undefined
-            ? undefined
-            : { athleteId, decisionId: input.decisionId, memory },
+          {
+            athleteId,
+            memory,
+            ...(input.decisionId === undefined ? {} : { decisionId: input.decisionId }),
+          },
         ),
       ),
   );

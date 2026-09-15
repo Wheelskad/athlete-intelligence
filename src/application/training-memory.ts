@@ -4,6 +4,8 @@ import type {
   PreWorkoutFeedback,
   PreWorkoutFeedbackDraft,
   PublicationVerification,
+  IntervalsWriteAudit,
+  IntervalsWriteAuditDraft,
   TrainingContextSnapshot,
   TrainingDecision,
   TrainingDecisionDraft,
@@ -55,11 +57,17 @@ export interface PreWorkoutFeedbackRepository {
   findLatest(athleteId: string, managedId?: string): Promise<PreWorkoutFeedback | undefined>;
 }
 
+export interface IntervalsWriteAuditRepository {
+  create(athleteId: string, draft: IntervalsWriteAuditDraft): Promise<IntervalsWriteAudit>;
+  findRecentForManagedId(athleteId: string, managedId: string, limit: number): Promise<IntervalsWriteAudit[]>;
+}
+
 export interface TrainingMemoryServices {
   contexts: TrainingContextRepository;
   decisions: TrainingDecisionRepository;
   managedWorkouts: ManagedWorkoutRepository;
   preWorkoutFeedback: PreWorkoutFeedbackRepository;
+  intervalsWriteAudits: IntervalsWriteAuditRepository;
 }
 
 const STATUS_TRANSITIONS: Record<DecisionStatus, DecisionStatus[]> = {

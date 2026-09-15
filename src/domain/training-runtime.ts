@@ -231,3 +231,20 @@ export interface PublicationVerification {
     parsedDurationMinutes?: number;
   };
 }
+
+export interface IntervalsWriteAudit {
+  id: string;
+  athleteId: string;
+  managedId: string;
+  operation: "CREATE" | "UPDATE";
+  caller: "publish_training_plan";
+  timestamp: string;
+  durationSentMinutes?: number;
+  parsedDurationMinutes?: number;
+  decisionId?: string;
+  intervalsExternalId?: string;
+  outcome: "VERIFIED" | "VERIFICATION_FAILED";
+  warningCode?: NonNullable<PublicationVerification["warning"]>["code"];
+}
+
+export type IntervalsWriteAuditDraft = Omit<IntervalsWriteAudit, "id" | "athleteId" | "timestamp">;
