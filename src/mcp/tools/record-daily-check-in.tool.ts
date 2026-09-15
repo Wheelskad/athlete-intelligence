@@ -4,6 +4,7 @@ import { recordDailyCheckIn } from "../../application/record-daily-check-in";
 import type { ApplicationOptions } from "../../application/get-week-summary";
 import type { AthleteDataProvider } from "../../domain/provider";
 import { toolResult } from "../tool-result";
+import { OAUTH_TOOL_META } from "../security";
 
 export const dailyCheckInInputSchema = z.object({
   fatigue: z.number().int().min(1).max(10),
@@ -26,6 +27,7 @@ export function registerRecordDailyCheckInTool(
         "Writes today's subjective fatigue and optional soreness, stress and motivation (1-10) to Intervals.icu. If the user gives no number, ask for a 1-10 value instead of inferring one. Call only after the user explicitly confirms the values. After writing, read get_training_context again before proposing calendar changes.",
       inputSchema: dailyCheckInInputSchema,
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+      _meta: OAUTH_TOOL_META,
     },
     async (input) =>
       toolResult(

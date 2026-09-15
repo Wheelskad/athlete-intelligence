@@ -1,22 +1,25 @@
 import { describe, expect, it } from "vitest";
 import { Client } from "@modelcontextprotocol/client";
 import { InMemoryTransport } from "@modelcontextprotocol/server";
+import { z } from "zod";
 import { getTrainingContext } from "../application/get-training-context";
 import { sanitizeTrainingContext } from "../privacy/sanitize";
 import { FixtureProvider } from "../providers/fixture-provider";
 import { createAthleteDataServer, TOOL_DEFINITIONS } from "./server";
 
 describe("MCP contract", () => {
-  it("declares three read tools and two explicitly state-changing tools", async () => {
-    expect(TOOL_DEFINITIONS).toHaveLength(5);
+  it("declares four read tools and two explicitly state-changing tools", async () => {
+    expect(TOOL_DEFINITIONS).toHaveLength(6);
     expect(TOOL_DEFINITIONS.map((tool) => tool.name)).toEqual([
       "get_week_summary",
       "get_recovery_summary",
       "get_training_context",
+      "get_performance_metrics",
       "record_daily_check_in",
       "publish_training_plan",
     ]);
     expect(TOOL_DEFINITIONS.map((tool) => tool.annotations)).toEqual([
+      { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
       { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
       { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
       { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
@@ -37,6 +40,55 @@ describe("MCP contract", () => {
       expect(
         listed.tools.map((tool) => ({ name: tool.name, annotations: tool.annotations })),
       ).toEqual(TOOL_DEFINITIONS);
+      expect(
+        listed.tools.every(
+          (tool) =>
+            JSON.stringify(tool._meta?.securitySchemes) ===
+            JSON.stringify([{ type: "oauth2", scopes: ["athlete:access"] }]),
+        ),
+      ).toBe(true);
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it("exposes the consolidated dashboard metrics as a compact MCP tool", async () => {
+    const server = createAthleteDataServer({
+      provider: FixtureProvider.anchoredAt("2026-09-14"),
+      options: {
+        timezone: "Europe/Paris",
+        maxHistoryDays: 42,
+        now: () => new Date("2026-09-14T07:30:00Z"),
+      },
+    });
+    const client = new Client({ name: "performance-test", version: "1.0.0" });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+    try {
+      const result = await client.callTool({
+        name: "get_performance_metrics",
+        arguments: { historyDays: 42 },
+      });
+      const output = z
+        .object({
+          performance: z.object({
+            weeklyTrend: z.array(z.object({ sessionCount: z.number() })),
+          }),
+          loadDynamics: z.object({
+            current: z.object({
+              fitness: z.number(),
+              fatigue: z.number(),
+              form: z.number(),
+            }),
+          }),
+          aerobicFitness: z.object({ vo2Max: z.object({ latest: z.number() }) }),
+        })
+        .parse(result.structuredContent);
+      expect(output.performance.weeklyTrend).toHaveLength(6);
+      expect(output.loadDynamics.current.fitness).toBeGreaterThan(0);
+      expect(output.aerobicFitness.vo2Max.latest).toBeGreaterThan(0);
     } finally {
       await client.close();
       await server.close();

@@ -1,0 +1,36 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "athlete-intelligence-mcp",
+  "main": "src/mcp-worker.ts",
+  "compatibility_date": "2026-09-12",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      "id": "96ded51c13b542e498f305469ee2899f"
+    }
+  ],
+  "vars": {
+    "DATA_SOURCE": "intervals",
+    "DEFAULT_TIMEZONE": "Europe/Paris",
+    "MAX_HISTORY_DAYS": "42",
+    "NODE_ENV": "production"
+  },
+  "secrets": {
+    "required": [
+      "INTERVALS_API_KEY",
+      "INTERVALS_ATHLETE_ID",
+      "ACCESS_CLIENT_ID",
+      "ACCESS_CLIENT_SECRET",
+      "ACCESS_TOKEN_URL",
+      "ACCESS_AUTHORIZATION_URL",
+      "ACCESS_JWKS_URL",
+      "ACCESS_ISSUER",
+      "COOKIE_ENCRYPTION_KEY",
+      "AUTHORIZED_EMAILS"
+    ]
+  },
+  "observability": {
+    "enabled": false
+  }
+}

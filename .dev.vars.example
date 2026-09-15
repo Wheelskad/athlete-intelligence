@@ -7,3 +7,15 @@ NODE_ENV=development
 # Required only when DATA_SOURCE=intervals.icu
 # INTERVALS_ATHLETE_ID=0
 # INTERVALS_API_KEY=replace-locally
+
+# Required by the dedicated OAuth-protected MCP Worker.
+# Create a Cloudflare Access for SaaS OIDC application whose callback is:
+# https://athlete-intelligence-mcp.alpine-lancer.workers.dev/callback
+# ACCESS_CLIENT_ID=replace-locally
+# ACCESS_CLIENT_SECRET=replace-locally
+# ACCESS_TOKEN_URL=https://your-team.cloudflareaccess.com/cdn-cgi/access/sso/oidc/your-app/token
+# ACCESS_AUTHORIZATION_URL=https://your-team.cloudflareaccess.com/cdn-cgi/access/sso/oidc/your-app/authorization
+# ACCESS_JWKS_URL=https://your-team.cloudflareaccess.com/cdn-cgi/access/sso/oidc/your-app/jwks
+# ACCESS_ISSUER=https://your-team.cloudflareaccess.com/cdn-cgi/access/sso/oidc/your-app
+# COOKIE_ENCRYPTION_KEY=generate-with-openssl-rand-hex-32
+# AUTHORIZED_EMAILS=your-login@example.com

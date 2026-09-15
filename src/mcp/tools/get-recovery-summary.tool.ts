@@ -5,6 +5,7 @@ import type { ApplicationOptions } from "../../application/get-week-summary";
 import type { AthleteDataProvider } from "../../domain/provider";
 import { sanitizeRecoverySummary } from "../../privacy/sanitize";
 import { toolResult } from "../tool-result";
+import { OAUTH_TOOL_META } from "../security";
 
 export const recoverySummaryInputSchema = z.object({
   days: z.number().int().min(3).max(42).default(7),
@@ -22,6 +23,7 @@ export function registerGetRecoverySummaryTool(
       description: "Returns non-medical sleep, resting-heart-rate and HRV trends with data coverage.",
       inputSchema: recoverySummaryInputSchema,
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+      _meta: OAUTH_TOOL_META,
     },
     async (input) =>
       toolResult(sanitizeRecoverySummary(await getRecoverySummary(provider, input, options))),

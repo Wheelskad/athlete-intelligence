@@ -5,6 +5,7 @@ import type { ApplicationOptions } from "../../application/get-week-summary";
 import type { AthleteDataProvider } from "../../domain/provider";
 import { sanitizeTrainingContext } from "../../privacy/sanitize";
 import { toolResult } from "../tool-result";
+import { OAUTH_TOOL_META } from "../security";
 
 export const trainingContextInputSchema = z.object({
   historyDays: z.number().int().min(7).max(42).default(14),
@@ -24,6 +25,7 @@ export function registerGetTrainingContextTool(
       description: "Primary weekly context: completed activity, recovery trends, upcoming sessions and missing metrics.",
       inputSchema: trainingContextInputSchema,
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+      _meta: OAUTH_TOOL_META,
     },
     async (input) =>
       toolResult(sanitizeTrainingContext(await getTrainingContext(provider, input, options))),

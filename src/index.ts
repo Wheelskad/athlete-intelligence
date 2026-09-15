@@ -1,5 +1,4 @@
 import { createMcpHandler } from "agents/mcp/server";
-import { dateInTimezone } from "./application/date-range";
 import { getTrainingContext } from "./application/get-training-context";
 import { parseConfig, type WorkerEnv } from "./config/env";
 import {
@@ -8,11 +7,10 @@ import {
   DASHBOARD_HTML,
   DASHBOARD_JS,
 } from "./dashboard/assets";
-import type { AthleteDataProvider } from "./domain/provider";
 import { createAthleteDataServer } from "./mcp/server";
 import { sanitizeTrainingContext } from "./privacy/sanitize";
-import { FixtureProvider } from "./providers/fixture-provider";
-import { IntervalsClient, IntervalsProviderError } from "./providers/intervals/intervals-client";
+import { createProvider } from "./providers/create-provider";
+import { IntervalsProviderError } from "./providers/intervals/intervals-client";
 
 function productionAuthPending(): Response {
   return Response.json(
@@ -50,18 +48,6 @@ async function hasAuthenticatedAccess(context: ExecutionContext): Promise<boolea
   }
 }
 
-function createProvider(config: ReturnType<typeof parseConfig>, today: string): AthleteDataProvider {
-  if (config.DATA_SOURCE === "fixtures") return FixtureProvider.anchoredAt(today);
-  if (!config.INTERVALS_API_KEY || !config.INTERVALS_ATHLETE_ID) {
-    throw new Error("Validated Intervals.icu credentials are unavailable");
-  }
-  return new IntervalsClient({
-    apiKey: config.INTERVALS_API_KEY,
-    athleteId: config.INTERVALS_ATHLETE_ID,
-    maxHistoryDays: config.MAX_HISTORY_DAYS,
-  });
-}
-
 function assetResponse(request: Request, body: string, contentType: string, html = false): Response {
   const headers = new Headers({
     "Content-Type": contentType,
@@ -83,7 +69,7 @@ async function dashboardData(request: Request, env: WorkerEnv): Promise<Response
   const url = new URL(request.url);
   const historyDays = Number(url.searchParams.get("historyDays") ?? "42");
   const now = new Date();
-  const provider = createProvider(config, dateInTimezone(now, config.DEFAULT_TIMEZONE));
+  const provider = createProvider(config, now);
   try {
     const context = await getTrainingContext(
       provider,
@@ -146,7 +132,7 @@ export default {
     if (url.pathname !== "/mcp") return Response.json({ error: "NOT_FOUND" }, { status: 404 });
     if (config.NODE_ENV === "production") return productionAuthPending();
     const now = new Date();
-    const provider = createProvider(config, dateInTimezone(now, config.DEFAULT_TIMEZONE));
+    const provider = createProvider(config, now);
     const handler = createMcpHandler(
       () =>
         createAthleteDataServer({

@@ -4,6 +4,7 @@ import { publishTrainingPlan } from "../../application/publish-training-plan";
 import type { ApplicationOptions } from "../../application/get-week-summary";
 import type { AthleteDataProvider } from "../../domain/provider";
 import { toolResult } from "../tool-result";
+import { OAUTH_TOOL_META } from "../security";
 
 const sportSchema = z.enum([
   "running",
@@ -46,6 +47,7 @@ export function registerPublishTrainingPlanTool(
         "Creates or updates only connector-managed workouts in the Intervals.icu calendar. Use native Intervals.icu workout text in description. Reuse managedId to reschedule or revise a previously published workout. Never call before showing the exact changes and receiving explicit user confirmation.",
       inputSchema: publishTrainingPlanInputSchema,
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+      _meta: OAUTH_TOOL_META,
     },
     async (input) =>
       toolResult(await publishTrainingPlan(provider, input.workouts, options)),
