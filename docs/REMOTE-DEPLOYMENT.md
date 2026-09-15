@@ -27,7 +27,7 @@ Le Worker est le **resource server** MCP et :
 7. ne jamais accepter un identifiant d’athlète libre envoyé par le modèle ;
 8. conserver la clé Intervals.icu dans un secret Worker et ne jamais l’inclure dans un token OAuth.
 
-Le serveur prend en charge Authorization Code + PKCE `S256`, CIMD et DCR de compatibilité. Il contrôle également CSRF, state signé à usage unique, nonce OIDC, signature JWKS, issuer, audience, expiration, e-mail autorisé et scope. Le paramètre `resource` est lié au grant et vérifié comme audience par la bibliothèque.
+Le serveur prend en charge Authorization Code + PKCE `S256`, CIMD et DCR de compatibilité. Il contrôle également CSRF, state chiffré et authentifié avec une durée de dix minutes, nonce OIDC, signature JWKS, issuer, audience, expiration, e-mail autorisé et scope. Le paramètre `resource` est lié au grant et vérifié comme audience par la bibliothèque.
 
 ## Configuration Cloudflare Access for SaaS
 

@@ -6,6 +6,7 @@ import {
 } from "@cloudflare/workers-oauth-provider";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { ATHLETE_ACCESS_SCOPE } from "../mcp/security";
+import { openAuthorizationState, sealAuthorizationState } from "./authorization-state";
 
 const STATE_TTL_SECONDS = 10 * 60;
 const CSRF_COOKIE = "__Host-athlete_mcp_csrf";
@@ -13,7 +14,6 @@ const textEncoder = new TextEncoder();
 const jwksByUrl = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 
 export interface AccessOAuthEnv {
-  OAUTH_KV: KVNamespace;
   OAUTH_PROVIDER: OAuthHelpers;
   ACCESS_CLIENT_ID: string;
   ACCESS_CLIENT_SECRET: string;
@@ -50,78 +50,6 @@ function bytesToBase64Url(bytes: Uint8Array): string {
   return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
 }
 
-function base64UrlToBytes(value: string): Uint8Array {
-  const normalized = value.replaceAll("-", "+").replaceAll("_", "/");
-  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
-  const binary = atob(padded);
-  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
-}
-
-async function hmacKey(secret: string): Promise<CryptoKey> {
-  return crypto.subtle.importKey(
-    "raw",
-    textEncoder.encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign", "verify"],
-  );
-}
-
-async function signedState(secret: string): Promise<{ id: string; value: string }> {
-  const id = crypto.randomUUID();
-  const signature = await crypto.subtle.sign("HMAC", await hmacKey(secret), textEncoder.encode(id));
-  return { id, value: `${id}.${bytesToBase64Url(new Uint8Array(signature))}` };
-}
-
-async function verifiedStateId(value: string, secret: string): Promise<string | undefined> {
-  const separator = value.lastIndexOf(".");
-  if (separator < 1) return undefined;
-  const id = value.slice(0, separator);
-  let signature: Uint8Array;
-  try {
-    signature = base64UrlToBytes(value.slice(separator + 1));
-  } catch {
-    return undefined;
-  }
-  const valid = await crypto.subtle.verify(
-    "HMAC",
-    await hmacKey(secret),
-    signature.buffer as ArrayBuffer,
-    textEncoder.encode(id),
-  );
-  return valid ? id : undefined;
-}
-
-async function storeState(
-  env: AccessOAuthEnv,
-  prefix: string,
-  value: unknown,
-): Promise<string> {
-  const state = await signedState(env.COOKIE_ENCRYPTION_KEY);
-  await env.OAUTH_KV.put(`${prefix}:${state.id}`, JSON.stringify(value), {
-    expirationTtl: STATE_TTL_SECONDS,
-  });
-  return state.value;
-}
-
-async function consumeState<T>(
-  env: AccessOAuthEnv,
-  prefix: string,
-  state: string,
-): Promise<T | undefined> {
-  const id = await verifiedStateId(state, env.COOKIE_ENCRYPTION_KEY);
-  if (!id) return undefined;
-  const key = `${prefix}:${id}`;
-  const value = await env.OAUTH_KV.get(key);
-  if (!value) return undefined;
-  await env.OAUTH_KV.delete(key);
-  try {
-    return JSON.parse(value) as T;
-  } catch {
-    return undefined;
-  }
-}
-
 function readCookie(request: Request, name: string): string | undefined {
   return request.headers
     .get("cookie")
@@ -155,6 +83,7 @@ function consentPage(
   oauthRequest: AuthRequest,
   state: string,
   csrfToken: string,
+  authorizationOrigin: string,
 ): Response {
   const clientName = escapeHtml(client.clientName ?? "MCP client");
   const scopes = oauthRequest.scope.map(escapeHtml).join(", ") || ATHLETE_ACCESS_SCOPE;
@@ -170,7 +99,7 @@ function consentPage(
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "no-store",
-      "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+      "Content-Security-Policy": `default-src 'none'; style-src 'unsafe-inline'; form-action 'self' ${authorizationOrigin}; frame-ancestors 'none'; base-uri 'none'`,
       "Referrer-Policy": "no-referrer",
       "X-Content-Type-Options": "nosniff",
       "X-Frame-Options": "DENY",
@@ -256,9 +185,20 @@ async function handleAuthorizeGet(request: Request, env: AccessOAuthEnv): Promis
   }
   const client = await env.OAUTH_PROVIDER.lookupClient(oauthRequest.clientId);
   if (!client) return new Response("Unknown OAuth client", { status: 400 });
-  const state = await storeState(env, "oauth:consent", oauthRequest);
+  const state = await sealAuthorizationState(
+    "oauth:consent",
+    oauthRequest,
+    env.COOKIE_ENCRYPTION_KEY,
+    STATE_TTL_SECONDS,
+  );
   const csrfToken = crypto.randomUUID();
-  return consentPage(client, oauthRequest, state, csrfToken);
+  return consentPage(
+    client,
+    oauthRequest,
+    state,
+    csrfToken,
+    new URL(env.ACCESS_AUTHORIZATION_URL).origin,
+  );
 }
 
 async function handleAuthorizePost(request: Request, env: AccessOAuthEnv): Promise<Response> {
@@ -270,17 +210,26 @@ async function handleAuthorizePost(request: Request, env: AccessOAuthEnv): Promi
   }
   const state = form.get("state");
   if (typeof state !== "string") return new Response("Missing authorization state", { status: 400 });
-  const oauthRequest = await consumeState<AuthRequest>(env, "oauth:consent", state);
+  const oauthRequest = await openAuthorizationState<AuthRequest>(
+    "oauth:consent",
+    state,
+    env.COOKIE_ENCRYPTION_KEY,
+  );
   if (!oauthRequest) return new Response("Invalid or expired authorization state", { status: 400 });
   if (form.get("decision") !== "allow") return denyAuthorization(oauthRequest);
 
   const pkce = await createPkce();
   const nonce = crypto.randomUUID();
-  const upstreamState = await storeState(env, "oauth:upstream", {
-    oauthRequest,
-    codeVerifier: pkce.verifier,
-    nonce,
-  } satisfies UpstreamState);
+  const upstreamState = await sealAuthorizationState(
+    "oauth:upstream",
+    {
+      oauthRequest,
+      codeVerifier: pkce.verifier,
+      nonce,
+    } satisfies UpstreamState,
+    env.COOKIE_ENCRYPTION_KEY,
+    STATE_TTL_SECONDS,
+  );
   return Response.redirect(
     upstreamAuthorizationUrl(request, env, upstreamState, pkce.challenge, nonce),
     302,
@@ -292,7 +241,11 @@ async function handleCallback(request: Request, env: AccessOAuthEnv): Promise<Re
   const state = url.searchParams.get("state");
   const code = url.searchParams.get("code");
   if (!state || !code) return new Response("Missing OAuth callback parameters", { status: 400 });
-  const upstream = await consumeState<UpstreamState>(env, "oauth:upstream", state);
+  const upstream = await openAuthorizationState<UpstreamState>(
+    "oauth:upstream",
+    state,
+    env.COOKIE_ENCRYPTION_KEY,
+  );
   if (!upstream) return new Response("Invalid or expired OAuth callback state", { status: 400 });
 
   const idToken = await exchangeAuthorizationCode(request, env, code, upstream.codeVerifier);

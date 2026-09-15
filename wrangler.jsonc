@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "athlete-data-connector",
+  "account_id": "5757c739bcf0dd1d26968e4dfa5df7fc",
   "main": "src/index.ts",
   "compatibility_date": "2026-09-12",
   "compatibility_flags": ["nodejs_compat"],

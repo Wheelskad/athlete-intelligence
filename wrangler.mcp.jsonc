@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "athlete-intelligence-mcp",
+  "account_id": "5757c739bcf0dd1d26968e4dfa5df7fc",
   "main": "src/mcp-worker.ts",
   "compatibility_date": "2026-09-12",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
