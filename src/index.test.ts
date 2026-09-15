@@ -47,4 +47,46 @@ describe("dashboard routes", () => {
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({ error: "INVALID_RANGE" });
   });
+
+  it("requires a validated Cloudflare Access identity in production", async () => {
+    const response = await worker.fetch(
+      new Request("http://localhost/api/dashboard?historyDays=42"),
+      { ...env, NODE_ENV: "production" },
+      context,
+    );
+    expect(response.status).toBe(401);
+    expect(response.headers.get("www-authenticate")).toContain("athlete-intelligence");
+    await expect(response.json()).resolves.toMatchObject({ error: "CLOUDFLARE_ACCESS_REQUIRED" });
+  });
+
+  it("serves production dashboard data to a validated Access identity", async () => {
+    const accessContext = {
+      access: {
+        aud: "test-audience",
+        getIdentity: () => Promise.resolve({ email: "athlete@example.test" }),
+      },
+    } as unknown as ExecutionContext;
+    const response = await worker.fetch(
+      new Request("http://localhost/api/dashboard?historyDays=42"),
+      { ...env, NODE_ENV: "production" },
+      accessContext,
+    );
+    expect(response.status).toBe(200);
+  });
+
+  it("keeps MCP disabled in production even for an Access identity", async () => {
+    const accessContext = {
+      access: {
+        aud: "test-audience",
+        getIdentity: () => Promise.resolve({ email: "athlete@example.test" }),
+      },
+    } as unknown as ExecutionContext;
+    const response = await worker.fetch(
+      new Request("http://localhost/mcp"),
+      { ...env, NODE_ENV: "production" },
+      accessContext,
+    );
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({ error: "PRODUCTION_AUTH_NOT_CONFIGURED" });
+  });
 });

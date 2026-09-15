@@ -24,6 +24,32 @@ function productionAuthPending(): Response {
   );
 }
 
+function productionAccessRequired(): Response {
+  return Response.json(
+    {
+      error: "CLOUDFLARE_ACCESS_REQUIRED",
+      message: "This deployment requires an authenticated Cloudflare Access identity.",
+    },
+    {
+      status: 401,
+      headers: {
+        "Cache-Control": "no-store",
+        "WWW-Authenticate": 'Bearer realm="athlete-intelligence"',
+      },
+    },
+  );
+}
+
+async function hasAuthenticatedAccess(context: ExecutionContext): Promise<boolean> {
+  if (!context.access) return false;
+  try {
+    const identity = await context.access.getIdentity();
+    return typeof identity?.email === "string" && identity.email.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 function createProvider(config: ReturnType<typeof parseConfig>, today: string): AthleteDataProvider {
   if (config.DATA_SOURCE === "fixtures") return FixtureProvider.anchoredAt(today);
   if (!config.INTERVALS_API_KEY || !config.INTERVALS_ATHLETE_ID) {
@@ -54,7 +80,6 @@ function assetResponse(request: Request, body: string, contentType: string, html
 
 async function dashboardData(request: Request, env: WorkerEnv): Promise<Response> {
   const config = parseConfig(env);
-  if (config.NODE_ENV === "production") return productionAuthPending();
   const url = new URL(request.url);
   const historyDays = Number(url.searchParams.get("historyDays") ?? "42");
   const now = new Date();
@@ -104,6 +129,10 @@ export default {
     if (!["GET", "HEAD"].includes(request.method) && url.pathname !== "/mcp") {
       return Response.json({ error: "METHOD_NOT_ALLOWED" }, { status: 405, headers: { Allow: "GET, HEAD" } });
     }
+    const config = parseConfig(env);
+    if (config.NODE_ENV === "production" && !(await hasAuthenticatedAccess(context))) {
+      return productionAccessRequired();
+    }
     if (url.pathname === "/") {
       return assetResponse(request, DASHBOARD_HTML, "text/html; charset=utf-8", true);
     }
@@ -115,7 +144,6 @@ export default {
     }
     if (url.pathname === "/api/dashboard") return dashboardData(request, env);
     if (url.pathname !== "/mcp") return Response.json({ error: "NOT_FOUND" }, { status: 404 });
-    const config = parseConfig(env);
     if (config.NODE_ENV === "production") return productionAuthPending();
     const now = new Date();
     const provider = createProvider(config, dateInTimezone(now, config.DEFAULT_TIMEZONE));

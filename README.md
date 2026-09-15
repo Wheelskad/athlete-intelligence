@@ -49,7 +49,7 @@ Sans compte Cloudflare authentifié, `npm run deploy:temporary` crée une prévi
 
 ### Worker live verrouillé
 
-L’environnement `live` cible un Worker distinct nommé `athlete-intelligence-live`. Il utilise `DATA_SOURCE=intervals` et `NODE_ENV=production` ; dans l’état actuel du jalon B, ses routes de données restent donc volontairement fermées avec `503 PRODUCTION_AUTH_NOT_CONFIGURED` :
+L’environnement `live` cible un Worker distinct nommé `athlete-intelligence-live`. Il utilise `DATA_SOURCE=intervals` et `NODE_ENV=production`. Le dashboard exige une identité validée par une politique Cloudflare Access attachée au Worker ; sans contexte Access, toutes les routes retournent `401 CLOUDFLARE_ACCESS_REQUIRED`. Le MCP reste volontairement fermé avec `503 PRODUCTION_AUTH_NOT_CONFIGURED` jusqu’à l’ajout de son flux OAuth 2.1 :
 
 ```bash
 npm run deploy:live
