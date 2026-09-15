@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { FixtureProvider } from "../providers/fixture-provider";
 import { recordDailyCheckIn } from "./record-daily-check-in";
 import { publishTrainingPlan } from "./publish-training-plan";
+import { publishTrainingPlanInputSchema } from "../mcp/tools/publish-training-plan.tool";
 
 const NOW = new Date("2026-09-14T07:30:00.000Z");
 const options = {
@@ -11,6 +12,19 @@ const options = {
 };
 
 describe("controlled writes", () => {
+  it("rejects publication without literal user confirmation", () => {
+    expect(publishTrainingPlanInputSchema.safeParse({
+      confirmed: false,
+      workouts: [{
+        managedId: "confirmed-workout",
+        date: "2026-09-17",
+        sport: "running",
+        title: "Easy run",
+        description: "- 40m easy",
+      }],
+    }).success).toBe(false);
+  });
+
   it("records today's check-in without changing unrelated wellness fields", async () => {
     const provider = FixtureProvider.anchoredAt("2026-09-14");
     await expect(
@@ -44,7 +58,7 @@ describe("controlled writes", () => {
       endDate: "2026-09-21",
     });
     expect(events.filter((event) => event.managedId === base.managedId)).toEqual([
-      {
+      expect.objectContaining({
         date: "2026-09-18",
         category: "WORKOUT",
         managedId: "week1-easy-run",
@@ -52,7 +66,7 @@ describe("controlled writes", () => {
         sport: "running",
         durationMinutes: 40,
         trainingLoad: 35,
-      },
+      }),
     ]);
   });
 

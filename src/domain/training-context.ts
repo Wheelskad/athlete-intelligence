@@ -1,6 +1,7 @@
 import type { WeekSummary } from "./activity";
 import type { RecoverySummary } from "./recovery";
 import type { ConsolidatedTrainingMetrics } from "./performance";
+import type { WorkoutStep } from "./workout";
 
 export interface PlannedEvent {
   date: string;
@@ -10,6 +11,11 @@ export interface PlannedEvent {
   sport?: string;
   durationMinutes?: number;
   trainingLoad?: number;
+  description?: string;
+  parsedDurationMinutes?: number;
+  intervalsExternalId?: string;
+  source?: "ATHLETE_INTELLIGENCE";
+  status?: "PLANNED" | "PUBLISHED";
 }
 
 export interface DailyCheckInUpdate {
@@ -25,6 +31,7 @@ export interface ManagedPlannedWorkout {
   sport: "running" | "cycling" | "indoor_cycling" | "mountain_biking" | "gravel_cycling" | "strength" | "other";
   title: string;
   description: string;
+  blocks?: WorkoutStep[] | undefined;
   durationMinutes?: number | undefined;
   trainingLoad?: number | undefined;
 }

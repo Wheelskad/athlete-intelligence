@@ -1,4 +1,5 @@
 import type { SafeActivity } from "../privacy/sanitize";
+import type { WorkoutStep } from "./workout";
 
 export type RuntimeType = "DAILY" | "POST_WORKOUT" | "WEEKLY" | "RECOVERY_CHANGE" | "ON_DEMAND";
 export type TrainingState = "RED" | "AMBER" | "GREEN" | "PRIME";
@@ -87,9 +88,22 @@ export interface TrainingContextSnapshot {
     label?: string;
     sport?: string;
     durationMinutes?: number;
+    parsedDurationMinutes?: number;
     trainingLoad?: number;
+    description?: string;
+    intervalsExternalId?: string;
+    source?: "ATHLETE_INTELLIGENCE";
+    status?: "PLANNED" | "PUBLISHED";
   }[];
-  subjective?: { date: string; fatigue: number; soreness?: number; stress?: number; motivation?: number };
+  subjective?: {
+    date?: string;
+    fatigue?: number;
+    soreness?: number;
+    stress?: number;
+    motivation?: number;
+    latestDailyCheckIn?: { date: string; fatigue: number; soreness?: number; stress?: number; motivation?: number };
+    latestPreWorkoutFeedback?: PreWorkoutFeedback;
+  };
   constraints: {
     highIntensityAllowed: boolean;
     maxDurationMinutes?: number;
@@ -134,7 +148,26 @@ export interface ProposedWorkout {
   durationMinutes?: number;
   expectedTrainingLoad?: number;
   scheduledDate?: string;
+  blocks?: WorkoutStep[];
 }
+
+export type PreWorkoutFeeling = "GREAT" | "OK" | "TIRED" | "NO_MOTIVATION";
+
+export interface PreWorkoutFeedback {
+  id: string;
+  athleteId: string;
+  createdAt: string;
+  managedId?: string;
+  feeling?: PreWorkoutFeeling;
+  fatigue?: number;
+  motivation?: number;
+  pain?: { location: string; severity: number };
+  timeAvailableMinutes?: number;
+  preferredSport?: string;
+  message?: string;
+}
+
+export type PreWorkoutFeedbackDraft = Omit<PreWorkoutFeedback, "id" | "athleteId" | "createdAt">;
 
 export interface ModelMetadata {
   provider: string;
@@ -174,7 +207,27 @@ export interface ManagedWorkout {
   currentDate?: string;
   intervalsExternalId?: string;
   latestDecisionId?: string;
+  sport?: WorkoutSport;
+  title?: string;
+  description?: string;
+  expectedDurationMinutes?: number;
+  parsedDurationMinutes?: number;
+  trainingLoad?: number;
+  blocks?: WorkoutStep[];
+  publicationVerification?: PublicationVerification;
   status: "PLANNED" | "PUBLISHED" | "COMPLETED" | "CANCELLED";
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PublicationVerification {
+  verified: boolean;
+  expectedDurationMinutes?: number;
+  parsedDurationMinutes?: number;
+  durationDeltaMinutes?: number;
+  warning?: {
+    code: "WORKOUT_DURATION_MISMATCH" | "WORKOUT_DURATION_UNAVAILABLE";
+    expectedDurationMinutes?: number;
+    parsedDurationMinutes?: number;
+  };
 }

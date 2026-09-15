@@ -1,6 +1,7 @@
 import {
   assertDecisionTransition,
   type ManagedWorkoutRepository,
+  type PreWorkoutFeedbackRepository,
   type PublishedManagedWorkout,
   type TrainingContextRepository,
   type TrainingDecisionRepository,
@@ -9,9 +10,13 @@ import {
 import type {
   DecisionStatus,
   ManagedWorkout,
+  PreWorkoutFeedback,
+  PreWorkoutFeedbackDraft,
+  PreWorkoutFeeling,
   TrainingContextSnapshot,
   TrainingDecision,
   TrainingDecisionDraft,
+  WorkoutSport,
 } from "../domain/training-runtime";
 
 function stableJson(value: unknown): string {
@@ -69,6 +74,28 @@ interface ManagedWorkoutRow {
   status: ManagedWorkout["status"];
   created_at: string;
   updated_at: string;
+  sport: WorkoutSport | null;
+  title: string | null;
+  description: string | null;
+  expected_duration_minutes: number | null;
+  parsed_duration_minutes: number | null;
+  training_load: number | null;
+  workout_blocks_json: string | null;
+  publication_verification_json: string | null;
+}
+
+interface PreWorkoutFeedbackRow {
+  id: string;
+  athlete_id: string;
+  created_at: string;
+  managed_id: string | null;
+  feeling: PreWorkoutFeeling | null;
+  fatigue: number | null;
+  motivation: number | null;
+  pain_json: string | null;
+  time_available_minutes: number | null;
+  preferred_sport: string | null;
+  message: string | null;
 }
 
 function parseJson(value: string): unknown {
@@ -105,6 +132,14 @@ function managedWorkoutFromRow(row: ManagedWorkoutRow): ManagedWorkout {
     ...(row.scheduled_date === null ? {} : { currentDate: row.scheduled_date }),
     ...(row.intervals_external_id === null ? {} : { intervalsExternalId: row.intervals_external_id }),
     ...(row.latest_decision_id === null ? {} : { latestDecisionId: row.latest_decision_id }),
+    ...(row.sport === null ? {} : { sport: row.sport }),
+    ...(row.title === null ? {} : { title: row.title }),
+    ...(row.description === null ? {} : { description: row.description }),
+    ...(row.expected_duration_minutes === null ? {} : { expectedDurationMinutes: row.expected_duration_minutes }),
+    ...(row.parsed_duration_minutes === null ? {} : { parsedDurationMinutes: row.parsed_duration_minutes }),
+    ...(row.training_load === null ? {} : { trainingLoad: row.training_load }),
+    ...(row.workout_blocks_json === null ? {} : { blocks: parseJson(row.workout_blocks_json) as NonNullable<ManagedWorkout["blocks"]> }),
+    ...(row.publication_verification_json === null ? {} : { publicationVerification: parseJson(row.publication_verification_json) as NonNullable<ManagedWorkout["publicationVerification"]> }),
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -227,14 +262,24 @@ export class D1ManagedWorkoutRepository implements ManagedWorkoutRepository {
       await this.db.prepare(
         `INSERT INTO managed_workouts (
           id, athlete_id, managed_id, intent, scheduled_date, intervals_external_id,
-          latest_decision_id, status, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'PUBLISHED', ?, ?)
+          latest_decision_id, status, created_at, updated_at, sport, title, description,
+          expected_duration_minutes, parsed_duration_minutes, training_load,
+          workout_blocks_json, publication_verification_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (athlete_id, managed_id) DO UPDATE SET
           intent = excluded.intent,
           scheduled_date = excluded.scheduled_date,
           intervals_external_id = COALESCE(excluded.intervals_external_id, managed_workouts.intervals_external_id),
           latest_decision_id = COALESCE(excluded.latest_decision_id, managed_workouts.latest_decision_id),
-          status = 'PUBLISHED',
+          status = excluded.status,
+          sport = COALESCE(excluded.sport, managed_workouts.sport),
+          title = COALESCE(excluded.title, managed_workouts.title),
+          description = COALESCE(excluded.description, managed_workouts.description),
+          expected_duration_minutes = COALESCE(excluded.expected_duration_minutes, managed_workouts.expected_duration_minutes),
+          parsed_duration_minutes = COALESCE(excluded.parsed_duration_minutes, managed_workouts.parsed_duration_minutes),
+          training_load = COALESCE(excluded.training_load, managed_workouts.training_load),
+          workout_blocks_json = COALESCE(excluded.workout_blocks_json, managed_workouts.workout_blocks_json),
+          publication_verification_json = COALESCE(excluded.publication_verification_json, managed_workouts.publication_verification_json),
           updated_at = excluded.updated_at`,
       ).bind(
         id,
@@ -244,8 +289,17 @@ export class D1ManagedWorkoutRepository implements ManagedWorkoutRepository {
         workout.currentDate ?? null,
         workout.intervalsExternalId ?? null,
         workout.latestDecisionId ?? null,
+        workout.verification?.verified === false ? "PLANNED" : "PUBLISHED",
         existing?.createdAt ?? now,
         now,
+        workout.sport ?? null,
+        workout.title ?? null,
+        workout.description ?? null,
+        workout.expectedDurationMinutes ?? null,
+        workout.parsedDurationMinutes ?? null,
+        workout.trainingLoad ?? null,
+        workout.blocks === undefined ? null : JSON.stringify(workout.blocks),
+        workout.verification === undefined ? null : JSON.stringify(workout.verification),
       ).run();
       const saved = await this.findByManagedId(athleteId, workout.managedId);
       if (saved !== undefined) results.push(saved);
@@ -261,11 +315,68 @@ export class D1ManagedWorkoutRepository implements ManagedWorkoutRepository {
   }
 }
 
+function feedbackFromRow(row: PreWorkoutFeedbackRow): PreWorkoutFeedback {
+  return {
+    id: row.id,
+    athleteId: row.athlete_id,
+    createdAt: row.created_at,
+    ...(row.managed_id === null ? {} : { managedId: row.managed_id }),
+    ...(row.feeling === null ? {} : { feeling: row.feeling }),
+    ...(row.fatigue === null ? {} : { fatigue: row.fatigue }),
+    ...(row.motivation === null ? {} : { motivation: row.motivation }),
+    ...(row.pain_json === null ? {} : { pain: parseJson(row.pain_json) as NonNullable<PreWorkoutFeedback["pain"]> }),
+    ...(row.time_available_minutes === null ? {} : { timeAvailableMinutes: row.time_available_minutes }),
+    ...(row.preferred_sport === null ? {} : { preferredSport: row.preferred_sport }),
+    ...(row.message === null ? {} : { message: row.message }),
+  };
+}
+
+export class D1PreWorkoutFeedbackRepository implements PreWorkoutFeedbackRepository {
+  constructor(private readonly db: D1Database) {}
+
+  async create(athleteId: string, draft: PreWorkoutFeedbackDraft): Promise<PreWorkoutFeedback> {
+    const saved: PreWorkoutFeedback = {
+      id: crypto.randomUUID(),
+      athleteId,
+      createdAt: new Date().toISOString(),
+      ...draft,
+    };
+    await this.db.prepare(
+      `INSERT INTO pre_workout_feedback (
+        id, athlete_id, created_at, managed_id, feeling, fatigue, motivation,
+        pain_json, time_available_minutes, preferred_sport, message
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      saved.id,
+      saved.athleteId,
+      saved.createdAt,
+      saved.managedId ?? null,
+      saved.feeling ?? null,
+      saved.fatigue ?? null,
+      saved.motivation ?? null,
+      saved.pain === undefined ? null : JSON.stringify(saved.pain),
+      saved.timeAvailableMinutes ?? null,
+      saved.preferredSport ?? null,
+      saved.message ?? null,
+    ).run();
+    return saved;
+  }
+
+  async findLatest(athleteId: string, managedId?: string): Promise<PreWorkoutFeedback | undefined> {
+    const query = managedId === undefined
+      ? this.db.prepare("SELECT * FROM pre_workout_feedback WHERE athlete_id = ? ORDER BY created_at DESC LIMIT 1").bind(athleteId)
+      : this.db.prepare("SELECT * FROM pre_workout_feedback WHERE athlete_id = ? AND managed_id = ? ORDER BY created_at DESC LIMIT 1").bind(athleteId, managedId);
+    const row = await query.first<PreWorkoutFeedbackRow>();
+    return row === null ? undefined : feedbackFromRow(row);
+  }
+}
+
 export function createD1TrainingMemory(db: D1Database): TrainingMemoryServices {
   const contexts = new D1TrainingContextRepository(db);
   return {
     contexts,
     decisions: new D1TrainingDecisionRepository(db, contexts),
     managedWorkouts: new D1ManagedWorkoutRepository(db),
+    preWorkoutFeedback: new D1PreWorkoutFeedbackRepository(db),
   };
 }

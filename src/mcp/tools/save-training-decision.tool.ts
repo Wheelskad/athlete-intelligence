@@ -49,6 +49,7 @@ export function registerSaveTrainingDecisionTool(
           ...(input.proposedWorkout.durationMinutes === undefined ? {} : { durationMinutes: input.proposedWorkout.durationMinutes }),
           ...(input.proposedWorkout.expectedTrainingLoad === undefined ? {} : { expectedTrainingLoad: input.proposedWorkout.expectedTrainingLoad }),
           ...(input.proposedWorkout.scheduledDate === undefined ? {} : { scheduledDate: input.proposedWorkout.scheduledDate }),
+          ...(input.proposedWorkout.blocks === undefined ? {} : { blocks: input.proposedWorkout.blocks }),
         },
       }),
       ...(input.managedId === undefined ? {} : { managedId: input.managedId }),

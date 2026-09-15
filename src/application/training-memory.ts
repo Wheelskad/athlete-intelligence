@@ -1,11 +1,16 @@
 import type {
   DecisionStatus,
   ManagedWorkout,
+  PreWorkoutFeedback,
+  PreWorkoutFeedbackDraft,
+  PublicationVerification,
   TrainingContextSnapshot,
   TrainingDecision,
   TrainingDecisionDraft,
   WorkoutIntent,
 } from "../domain/training-runtime";
+import type { WorkoutSport } from "../domain/training-runtime";
+import type { WorkoutStep } from "../domain/workout";
 
 export interface TrainingContextRepository {
   create(snapshot: Omit<TrainingContextSnapshot, "id">): Promise<TrainingContextSnapshot>;
@@ -30,6 +35,14 @@ export interface PublishedManagedWorkout {
   currentDate?: string;
   intervalsExternalId?: string;
   latestDecisionId?: string;
+  sport?: WorkoutSport;
+  title?: string;
+  description?: string;
+  expectedDurationMinutes?: number;
+  parsedDurationMinutes?: number;
+  trainingLoad?: number;
+  blocks?: WorkoutStep[];
+  verification?: PublicationVerification;
 }
 
 export interface ManagedWorkoutRepository {
@@ -37,10 +50,16 @@ export interface ManagedWorkoutRepository {
   findByManagedId(athleteId: string, managedId: string): Promise<ManagedWorkout | undefined>;
 }
 
+export interface PreWorkoutFeedbackRepository {
+  create(athleteId: string, draft: PreWorkoutFeedbackDraft): Promise<PreWorkoutFeedback>;
+  findLatest(athleteId: string, managedId?: string): Promise<PreWorkoutFeedback | undefined>;
+}
+
 export interface TrainingMemoryServices {
   contexts: TrainingContextRepository;
   decisions: TrainingDecisionRepository;
   managedWorkouts: ManagedWorkoutRepository;
+  preWorkoutFeedback: PreWorkoutFeedbackRepository;
 }
 
 const STATUS_TRANSITIONS: Record<DecisionStatus, DecisionStatus[]> = {

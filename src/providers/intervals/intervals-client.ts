@@ -12,6 +12,7 @@ import {
   intervalsUnavailableActivitySchema,
   intervalsWellnessResponseSchema,
 } from "./intervals-types";
+import type { IntervalsEvent } from "./intervals-types";
 import { z } from "zod";
 import { mapWellness } from "./wellness-mapper";
 
@@ -131,19 +132,13 @@ export class IntervalsClient implements AthleteDataProvider {
     const payload = await this.request("events", range);
     const parsed = intervalsEventsResponseSchema.safeParse(payload);
     if (!parsed.success) throw this.invalidResponse();
-    return parsed.data.map((event) => ({
-      date: event.start_date_local.slice(0, 10),
-      category: event.category,
-      ...(event.external_id?.startsWith(MANAGED_EVENT_PREFIX)
-        ? {
-            managedId: event.external_id.slice(MANAGED_EVENT_PREFIX.length),
-            ...(event.name == null ? {} : { label: event.name }),
-          }
-        : {}),
-      ...(event.type == null ? {} : { sport: normalizeSport(event.type) }),
-      ...(event.moving_time == null ? {} : { durationMinutes: Math.round(event.moving_time / 60) }),
-      ...(event.icu_training_load == null ? {} : { trainingLoad: event.icu_training_load }),
-    }));
+    return parsed.data.map((event) => this.mapEvent(event));
+  }
+
+  async getManagedPlannedWorkout(managedId: string, date: string): Promise<PlannedEvent | undefined> {
+    assertIsoDate(date, "date");
+    const events = await this.getPlannedEvents({ startDate: date, endDate: date });
+    return events.find((event) => event.managedId === managedId);
   }
 
   async recordDailyCheckIn(date: string, update: DailyCheckInUpdate): Promise<void> {
@@ -251,6 +246,30 @@ export class IntervalsClient implements AthleteDataProvider {
     if (sport === "indoor_cycling") return "VirtualRide";
     if (sport === "cycling") return "Ride";
     return "Other";
+  }
+
+  private mapEvent(event: IntervalsEvent): PlannedEvent {
+    const managed = event.external_id?.startsWith(MANAGED_EVENT_PREFIX) === true;
+    const managedId = managed ? event.external_id?.slice(MANAGED_EVENT_PREFIX.length) : undefined;
+    const parsedSeconds = event.workout_doc?.duration ?? event.moving_time;
+    return {
+      date: event.start_date_local.slice(0, 10),
+      category: event.category,
+      ...(managedId === undefined
+        ? {}
+        : {
+            managedId,
+            source: "ATHLETE_INTELLIGENCE" as const,
+            status: "PUBLISHED" as const,
+            ...(event.name == null ? {} : { label: event.name }),
+          }),
+      ...(event.id == null ? {} : { intervalsExternalId: String(event.id) }),
+      ...(event.type == null ? {} : { sport: normalizeSport(event.type) }),
+      ...(event.moving_time == null ? {} : { durationMinutes: Math.round(event.moving_time / 60) }),
+      ...(parsedSeconds == null ? {} : { parsedDurationMinutes: Math.round(parsedSeconds / 6) / 10 }),
+      ...(event.icu_training_load == null ? {} : { trainingLoad: event.icu_training_load }),
+      ...(event.description == null ? {} : { description: event.description }),
+    };
   }
 
   private httpError(status: number): IntervalsProviderError {

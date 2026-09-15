@@ -51,6 +51,7 @@ export const intervalsWellnessSchema = z
 
 export const intervalsEventSchema = z
   .looseObject({
+    id: z.union([z.string(), z.number()]).optional().nullable(),
     start_date_local: z.string().min(10),
     category: z.string().min(1),
     type: z.string().optional().nullable(),
@@ -58,6 +59,8 @@ export const intervalsEventSchema = z
     icu_training_load: finiteNumber.optional().nullable(),
     external_id: z.string().optional().nullable(),
     name: z.string().optional().nullable(),
+    description: z.string().optional().nullable(),
+    workout_doc: z.looseObject({ duration: finiteNumber.optional().nullable() }).optional().nullable(),
   });
 
 export const intervalsActivitiesResponseSchema = z.array(intervalsActivitySchema);

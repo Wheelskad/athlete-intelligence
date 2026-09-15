@@ -6,6 +6,7 @@ import {
 import type {
   DecisionStatus,
   ManagedWorkout,
+  PreWorkoutFeedback,
   TrainingContextSnapshot,
   TrainingDecision,
   TrainingDecisionDraft,
@@ -15,6 +16,7 @@ export function createInMemoryTrainingMemory(): TrainingMemoryServices {
   const snapshots = new Map<string, TrainingContextSnapshot>();
   const decisions = new Map<string, TrainingDecision>();
   const managedWorkouts = new Map<string, ManagedWorkout>();
+  const feedback = new Map<string, PreWorkoutFeedback>();
 
   return {
     contexts: {
@@ -91,7 +93,15 @@ export function createInMemoryTrainingMemory(): TrainingMemoryServices {
             ...(workout.latestDecisionId === undefined
               ? existing?.latestDecisionId === undefined ? {} : { latestDecisionId: existing.latestDecisionId }
               : { latestDecisionId: workout.latestDecisionId }),
-            status: "PUBLISHED",
+            ...(workout.sport === undefined ? {} : { sport: workout.sport }),
+            ...(workout.title === undefined ? {} : { title: workout.title }),
+            ...(workout.description === undefined ? {} : { description: workout.description }),
+            ...(workout.expectedDurationMinutes === undefined ? {} : { expectedDurationMinutes: workout.expectedDurationMinutes }),
+            ...(workout.parsedDurationMinutes === undefined ? {} : { parsedDurationMinutes: workout.parsedDurationMinutes }),
+            ...(workout.trainingLoad === undefined ? {} : { trainingLoad: workout.trainingLoad }),
+            ...(workout.blocks === undefined ? {} : { blocks: structuredClone(workout.blocks) }),
+            ...(workout.verification === undefined ? {} : { publicationVerification: structuredClone(workout.verification) }),
+            status: workout.verification?.verified === false ? "PLANNED" : "PUBLISHED",
             createdAt: existing?.createdAt ?? now,
             updatedAt: now,
           };
@@ -103,6 +113,24 @@ export function createInMemoryTrainingMemory(): TrainingMemoryServices {
       findByManagedId(athleteId, managedId) {
         const value = managedWorkouts.get(`${athleteId}:${managedId}`);
         return Promise.resolve(value === undefined ? undefined : structuredClone(value));
+      },
+    },
+    preWorkoutFeedback: {
+      create(athleteId, draft) {
+        const saved: PreWorkoutFeedback = {
+          id: crypto.randomUUID(),
+          athleteId,
+          createdAt: new Date().toISOString(),
+          ...structuredClone(draft),
+        };
+        feedback.set(saved.id, saved);
+        return Promise.resolve(structuredClone(saved));
+      },
+      findLatest(athleteId, managedId?) {
+        const saved = [...feedback.values()]
+          .filter((item) => item.athleteId === athleteId && (managedId === undefined || item.managedId === managedId))
+          .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
+        return Promise.resolve(saved === undefined ? undefined : structuredClone(saved));
       },
     },
   };

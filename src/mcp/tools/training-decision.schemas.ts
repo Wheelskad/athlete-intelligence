@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { workoutBlocksSchema } from "./workout.schemas";
 
 export const managedIdSchema = z.string().regex(/^[a-z0-9][a-z0-9_-]{2,63}$/);
 
@@ -19,6 +20,7 @@ export const proposedWorkoutSchema = z.object({
   durationMinutes: z.number().int().min(0).max(600).optional(),
   expectedTrainingLoad: z.number().min(0).max(500).optional(),
   scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  blocks: workoutBlocksSchema.optional(),
 });
 
 export const trainingDecisionDraftSchema = z.object({
@@ -45,4 +47,7 @@ export const trainingDecisionDraftSchema = z.object({
 }).refine(
   (decision) => decision.proposedWorkout === undefined || decision.managedId !== undefined,
   { message: "managedId is required when proposedWorkout is provided", path: ["managedId"] },
+).refine(
+  (decision) => decision.originalWorkout?.managedId === undefined || decision.originalWorkout.managedId === decision.managedId,
+  { message: "An adapted workout must reuse the original managedId", path: ["managedId"] },
 );

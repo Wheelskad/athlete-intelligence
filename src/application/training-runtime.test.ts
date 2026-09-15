@@ -103,4 +103,56 @@ describe("training runtime persistence", () => {
       memory.managedWorkouts.findByManagedId(athlete.athleteId, "daily-20260915-endurance"),
     ).resolves.toMatchObject({ status: "PUBLISHED", latestDecisionId: decision.id });
   });
+
+  it("does not mark an accepted decision published when read-back duration mismatches", async () => {
+    const provider = FixtureProvider.anchoredAt("2026-09-14");
+    const readBack = provider.getManagedPlannedWorkout.bind(provider);
+    provider.getManagedPlannedWorkout = async (managedId, date) => {
+      const event = await readBack(managedId, date);
+      return event === undefined ? undefined : { ...event, parsedDurationMinutes: 31 };
+    };
+    const memory = createInMemoryTrainingMemory();
+    const runtime = new TrainingRuntimeService(
+      new TrainingContextService(provider, options, athlete), memory, athlete.athleteId, now,
+    );
+    const context = await runtime.getRuntimeContext({ historyDays: 42, calendarDays: 7 });
+    const decision = await runtime.saveDecision({
+      contextSnapshotId: context.id,
+      runtimeType: "DAILY",
+      state: "AMBER",
+      action: "REDUCE",
+      confidence: "HIGH",
+      signals: [{ metric: "time", value: 35, direction: "NEUTRAL", importance: "HIGH", explanation: "Available time." }],
+      reasoningSummary: ["Shortened to available time."],
+      proposedWorkout: {
+        intent: "FORCE",
+        sport: "indoor_cycling",
+        title: "Force endurance",
+        description: "- 55m endurance",
+        durationMinutes: 55,
+        scheduledDate: "2026-09-16",
+      },
+      managedId: "ai-duration-mismatch",
+      modelMetadata: { provider: "openai", model: "test", coachPromptVersion: "v1", schemaVersion: "1" },
+    });
+    await runtime.updateDecisionStatus(decision.id, "ACCEPTED");
+    const result = await publishTrainingPlan(provider, [{
+      managedId: "ai-duration-mismatch",
+      date: "2026-09-16",
+      sport: "indoor_cycling",
+      title: "Force endurance",
+      description: "- 55m endurance",
+      durationMinutes: 55,
+    }], options, { athleteId: athlete.athleteId, decisionId: decision.id, memory });
+    expect(result).toMatchObject({
+      updated: true,
+      verified: false,
+      warning: { code: "WORKOUT_DURATION_MISMATCH", expectedDurationMinutes: 55, parsedDurationMinutes: 31 },
+    });
+    await expect(memory.decisions.findById(decision.id, athlete.athleteId)).resolves.toMatchObject({ status: "ACCEPTED" });
+    await expect(memory.managedWorkouts.findByManagedId(athlete.athleteId, "ai-duration-mismatch")).resolves.toMatchObject({
+      status: "PLANNED",
+      publicationVerification: { verified: false },
+    });
+  });
 });

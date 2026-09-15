@@ -12,7 +12,7 @@ Ce n'est pas un dispositif médical : les chiffres décrivent l'entraînement, i
 - historique fitness (CTL), fatigue (ATL) et forme (TSB) ;
 - synthèse hebdomadaire, régularité et répartition par sport ;
 - VO₂ max, FTP, TRIMP, charge cardiaque et efficacité quand Intervals.icu les fournit ;
-- dix outils MCP pour ChatGPT ou MCP Inspector ;
+- treize outils MCP pour ChatGPT ou MCP Inspector ;
 - snapshots immuables et historique des décisions du coach dans Cloudflare D1 ;
 - mode démo sans compte ni donnée personnelle ;
 - mode live avec Intervals.icu ;
@@ -106,15 +106,80 @@ npx @modelcontextprotocol/inspector@latest --cli \
 | `get_training_context` | Contexte complet avec calendrier à venir |
 | `get_performance_metrics` | Vue consolidée utilisée par le dashboard |
 | `get_training_runtime_context` | Snapshot normalisé complet et décisions récentes |
+| `get_coach_dashboard` | Vue compacte du jour : récupération, charge, prochaine séance et décision en attente |
+| `get_workout_detail` | Détail canonique d'une séance gérée et durée relue dans Intervals.icu |
 | `get_training_decision_history` | Historique compact des recommandations |
 | `save_training_decision` | Persiste une proposition structurée de ChatGPT |
 | `update_training_decision_status` | Accepte ou refuse une proposition confirmée |
 | `record_daily_check_in` | Enregistre fatigue, stress, motivation et courbatures |
+| `record_pre_workout_feedback` | Conserve le ressenti pré-séance, le temps disponible, la préférence sportive ou une douleur déclarée |
 | `publish_training_plan` | Publie jusqu'à 14 séances confirmées |
 
-Les six outils de consultation sont en lecture seule du point de vue de l'athlète. `get_training_runtime_context` capture toutefois une copie immuable du contexte pour l'audit. Une décision est d'abord `PROPOSED`, puis explicitement `ACCEPTED` ou `REJECTED`. La publication est séparée et fait passer une décision acceptée à `PUBLISHED`. Les confirmations utilisateur sont obligatoires pour le ressenti, l'acceptation/refus et la publication. Le planning ne peut mettre à jour que les événements créés par ce connecteur, identifiés par le préfixe `athlete-ai:`.
+Les huit outils de consultation sont en lecture seule du point de vue de l'athlète. `get_training_runtime_context` et `get_coach_dashboard` capturent toutefois une copie immuable du contexte pour l'audit. Une décision est d'abord `PROPOSED`, puis explicitement `ACCEPTED` ou `REJECTED`. La publication est séparée et fait passer une décision acceptée à `PUBLISHED` uniquement si la séance relue dans Intervals.icu est valide. Les confirmations utilisateur sont obligatoires pour le ressenti, l'acceptation/refus et la publication. Le planning ne peut mettre à jour que les événements créés par ce connecteur, identifiés par le préfixe `athlete-ai:`.
 
 ChatGPT reste le moteur de décision : aucun score maison ne choisit automatiquement une séance. Le serveur calcule seulement les métriques, fournit les contraintes et persiste le résultat structuré. `reasoningSummary` doit contenir quelques explications destinées à l'utilisateur, jamais une chain-of-thought.
+
+## Adaptive coaching runtime
+
+```text
+Intervals.icu
+     ↓
+Athlete Intelligence
+     ↓
+contexte normalisé et immuable
+     ↓
+LLM coach
+     ↓
+décision structurée
+     ↓
+confirmation utilisateur
+     ↓
+écriture Intervals.icu contrôlée puis vérifiée
+```
+
+`get_coach_dashboard` est le point d'entrée conseillé pour les demandes courtes comme « coach » ou « séance ? ». Il rassemble en un appel les métriques de récupération et de charge, la prochaine séance gérée, les deux ou trois suivantes, le dernier feedback subjectif et une éventuelle décision en attente. Le champ `state` ne vient jamais d'une règle de coaching cachée : il reprend uniquement l'état d'une décision déjà produite par le modèle, sinon il vaut `null`.
+
+`get_workout_detail` retourne la description canonique, les blocs structurés disponibles, la durée attendue et la durée réellement interprétée par Intervals.icu. `record_pre_workout_feedback` complète le check-in quotidien : « flemme » peut être conservé comme `NO_MOTIVATION` avec son texte libre, tandis qu'une fatigue ou une douleur chiffrée n'est jamais déduite d'un message vague. Une douleur déclarée reste un ressenti subjectif et non un diagnostic.
+
+Chaque séance créée par le connecteur possède un `managedId` stable. Une adaptation ou un déplacement réutilise cet identifiant ; une séance sans le préfixe privé `athlete-ai:` ne peut pas être écrasée par l'upsert. Plusieurs séances gérées peuvent coexister sur les 5 à 7 prochains jours.
+
+Les blocs structurés de `publish_training_plan` sont sérialisés au format natif du Workout Builder. Un bloc répété est notamment envoyé sous cette forme, sans indentation :
+
+```text
+4x
+- 5m seated, cadence 55-60rpm, RPE 6/10
+- 3m easy, cadence 90-95rpm
+```
+
+Après l'écriture, le connecteur relit l'événement et compare sa durée `workout_doc` à la durée attendue avec une tolérance d'une minute. Le résultat contient `verified`, `parsedDurationMinutes` et `durationDeltaMinutes`. En cas de `WORKOUT_DURATION_MISMATCH` ou de durée indisponible, la décision reste `ACCEPTED`, la vérification est persistée et elle ne passe pas silencieusement à `PUBLISHED`.
+
+Cycle de décision :
+
+```text
+PROPOSED → ACCEPTED → publication vérifiée → PUBLISHED
+         ↘ REJECTED
+```
+
+Le service applicatif `buildCoachRuntime({ runtimeType: "DAILY" | "WEEKLY" })` prépare aussi un snapshot factuel pour une future exécution planifiée. Il ne contient aucune règle choisissant la séance : l'appel externe au modèle restera responsable de la décision.
+
+Exemple de parcours complet :
+
+```text
+"coach"
+→ get_coach_dashboard
+→ proposition enregistrée avec save_training_decision
+
+"flemme, 35 min"
+→ record_pre_workout_feedback après confirmation
+→ nouveau dashboard
+→ proposition REDUCE conservant le même managedId
+
+"go"
+→ update_training_decision_status(ACCEPTED)
+→ publish_training_plan
+→ relecture et vérification
+→ PUBLISHED seulement si la durée est cohérente
+```
 
 Exemples :
 

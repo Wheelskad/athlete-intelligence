@@ -27,4 +27,5 @@ export interface AthleteDataProvider {
   getPlannedEvents(range: DateRange): Promise<PlannedEvent[]>;
   recordDailyCheckIn(date: string, update: DailyCheckInUpdate): Promise<void>;
   upsertManagedPlannedWorkouts(workouts: ManagedPlannedWorkout[]): Promise<PublishedPlannedWorkout[]>;
+  getManagedPlannedWorkout(managedId: string, date: string): Promise<PlannedEvent | undefined>;
 }

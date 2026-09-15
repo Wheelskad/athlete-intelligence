@@ -12,17 +12,20 @@ const athlete = { athleteId: "test-athlete", goals: [], preferences: {} };
 
 describe("MCP contract", () => {
   it("declares runtime memory tools alongside the existing connector tools", async () => {
-    expect(TOOL_DEFINITIONS).toHaveLength(10);
+    expect(TOOL_DEFINITIONS).toHaveLength(13);
     expect(TOOL_DEFINITIONS.map((tool) => tool.name)).toEqual([
       "get_week_summary",
       "get_recovery_summary",
       "get_training_context",
       "get_performance_metrics",
       "get_training_runtime_context",
+      "get_coach_dashboard",
+      "get_workout_detail",
       "get_training_decision_history",
       "save_training_decision",
       "update_training_decision_status",
       "record_daily_check_in",
+      "record_pre_workout_feedback",
       "publish_training_plan",
     ]);
     expect(TOOL_DEFINITIONS.map((tool) => tool.annotations)).toEqual([
@@ -32,9 +35,12 @@ describe("MCP contract", () => {
       { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
       { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
       { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+      { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+      { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
       { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
       { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
       { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+      { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
       { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
     ]);
 

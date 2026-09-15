@@ -3,6 +3,7 @@ import { getTrainingContext } from "./get-training-context";
 import type { AthleteDataProvider } from "../domain/provider";
 import type { AthleteContext, TrainingContextSnapshot } from "../domain/training-runtime";
 import { sanitizeActivity } from "../privacy/sanitize";
+import { dateInTimezone } from "./date-range";
 
 function normalizedTrend(
   trend: "improving" | "stable" | "declining" | "unknown",
@@ -30,6 +31,8 @@ export class TrainingContextService {
       { historyDays, includeUpcomingCalendar: true, calendarDays },
       this.options,
     );
+    const today = dateInTimezone(this.options.now?.() ?? new Date(), this.options.timezone);
+    const todayEvents = await this.provider.getPlannedEvents({ startDate: today, endDate: today });
     const load = context.recovery.loadDynamics?.current;
     const currentRolling = context.performance.rolling7Days.current;
     const previousRolling = context.performance.rolling7Days.previous;
@@ -130,7 +133,21 @@ export class TrainingContextService {
         ),
       },
       recentActivities: context.activities.activities.map(sanitizeActivity),
-      upcomingWorkouts: (context.upcomingCalendar?.events ?? []).map((event) => ({ ...event })),
+      upcomingWorkouts: [...todayEvents, ...(context.upcomingCalendar?.events ?? [])]
+        .sort((left, right) => left.date.localeCompare(right.date))
+        .map((event) => ({
+          date: event.date,
+          category: event.category,
+          ...(event.managedId === undefined ? {} : { managedId: event.managedId }),
+          ...(event.label === undefined ? {} : { label: event.label }),
+          ...(event.sport === undefined ? {} : { sport: event.sport }),
+          ...(event.durationMinutes === undefined ? {} : { durationMinutes: event.durationMinutes }),
+          ...(event.parsedDurationMinutes === undefined ? {} : { parsedDurationMinutes: event.parsedDurationMinutes }),
+          ...(event.trainingLoad === undefined ? {} : { trainingLoad: event.trainingLoad }),
+          ...(event.description === undefined ? {} : { description: event.description }),
+          ...(event.source === undefined ? {} : { source: event.source }),
+          ...(event.status === undefined ? {} : { status: event.status }),
+        })),
       ...(checkIn?.fatigue === undefined ? {} : {
         subjective: {
           date: checkIn.date,
@@ -138,6 +155,13 @@ export class TrainingContextService {
           ...(checkIn.soreness === undefined ? {} : { soreness: checkIn.soreness }),
           ...(checkIn.stress === undefined ? {} : { stress: checkIn.stress }),
           ...(checkIn.motivation === undefined ? {} : { motivation: checkIn.motivation }),
+          latestDailyCheckIn: {
+            date: checkIn.date,
+            fatigue: checkIn.fatigue,
+            ...(checkIn.soreness === undefined ? {} : { soreness: checkIn.soreness }),
+            ...(checkIn.stress === undefined ? {} : { stress: checkIn.stress }),
+            ...(checkIn.motivation === undefined ? {} : { motivation: checkIn.motivation }),
+          },
         },
       }),
       constraints: {
@@ -158,5 +182,9 @@ export class TrainingContextService {
       },
       sourceFreshness: { ...context.freshness },
     };
+  }
+
+  getManagedPlannedWorkout(managedId: string, date: string) {
+    return this.provider.getManagedPlannedWorkout(managedId, date);
   }
 }

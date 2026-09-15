@@ -6,6 +6,7 @@ import type { AthleteDataProvider } from "../../domain/provider";
 import { toolResult } from "../tool-result";
 import { OAUTH_TOOL_META } from "../security";
 import type { TrainingMemoryServices } from "../../application/training-memory";
+import { workoutBlocksSchema } from "./workout.schemas";
 
 const sportSchema = z.enum([
   "running",
@@ -29,6 +30,7 @@ export const publishTrainingPlanInputSchema = z.object({
         description: z.string().trim().min(1).max(4_000),
         durationMinutes: z.number().int().min(10).max(600).optional(),
         trainingLoad: z.number().min(0).max(500).optional(),
+        blocks: workoutBlocksSchema.optional(),
       }),
     )
     .min(1)
@@ -48,7 +50,7 @@ export function registerPublishTrainingPlanTool(
     {
       title: "Publish confirmed workouts",
       description:
-        "Creates or updates only connector-managed workouts in the Intervals.icu calendar. Use native Intervals.icu workout text in description. Reuse managedId to reschedule or revise a previously published workout. For a saved coach proposal, pass decisionId; it must already be ACCEPTED and will become PUBLISHED. Never call before showing the exact changes and receiving explicit user confirmation.",
+        "Creates or updates only connector-managed workouts in the Intervals.icu calendar. Prefer structured blocks: the server serializes repeats to native Intervals.icu syntax and verifies interpreted duration after read-back. Reuse managedId to adapt an existing workout. For a saved coach proposal, pass decisionId; it must already be ACCEPTED and becomes PUBLISHED only after successful verification. Never call before showing exact changes and receiving explicit confirmation.",
       inputSchema: publishTrainingPlanInputSchema,
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
       _meta: OAUTH_TOOL_META,

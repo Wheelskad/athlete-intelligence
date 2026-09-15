@@ -49,9 +49,15 @@ export class FixtureProvider implements AthleteDataProvider {
         managedId: workout.managedId,
         label: workout.title,
         sport: workout.sport,
+        description: workout.description,
+        source: "ATHLETE_INTELLIGENCE" as const,
+        status: "PUBLISHED" as const,
         ...(workout.durationMinutes === undefined
           ? {}
           : { durationMinutes: workout.durationMinutes }),
+        ...(workout.durationMinutes === undefined
+          ? {}
+          : { parsedDurationMinutes: workout.durationMinutes }),
         ...(workout.trainingLoad === undefined ? {} : { trainingLoad: workout.trainingLoad }),
       };
       const index = this.data.events.findIndex((item) => item.managedId === workout.managedId);
@@ -64,5 +70,10 @@ export class FixtureProvider implements AthleteDataProvider {
         intervalsExternalId: `fixture:${workout.managedId}`,
       })),
     );
+  }
+
+  getManagedPlannedWorkout(managedId: string, date: string) {
+    const event = this.data.events.find((item) => item.managedId === managedId && item.date === date);
+    return Promise.resolve(event === undefined ? undefined : structuredClone(event));
   }
 }

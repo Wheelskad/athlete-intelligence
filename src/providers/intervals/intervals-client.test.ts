@@ -60,6 +60,32 @@ describe("IntervalsClient errors", () => {
 });
 
 describe("IntervalsClient controlled writes", () => {
+  it("reads the duration interpreted by Intervals workout_doc", async () => {
+    const fetchImpl = vi.fn<typeof fetch>(() => Promise.resolve(Response.json([{
+      id: 123,
+      start_date_local: "2026-09-17T00:00:00",
+      category: "WORKOUT",
+      type: "VirtualRide",
+      external_id: "athlete-ai:force-bike",
+      name: "Force bike",
+      description: "4x\n- 5m force\n- 3m easy",
+      moving_time: 1_860,
+      workout_doc: { duration: 3_300 },
+    }])));
+    const client = new IntervalsClient({
+      apiKey: "fixture-secret",
+      athleteId: "0",
+      maxHistoryDays: 42,
+      fetchImpl,
+    });
+    await expect(client.getManagedPlannedWorkout("force-bike", "2026-09-17")).resolves.toMatchObject({
+      managedId: "force-bike",
+      durationMinutes: 31,
+      parsedDurationMinutes: 55,
+      description: "4x\n- 5m force\n- 3m easy",
+    });
+  });
+
   it("updates only the selected wellness fields for today's date", async () => {
     const fetchImpl = vi.fn<typeof fetch>(() =>
       Promise.resolve(new Response(null, { status: 204 })),
@@ -113,6 +139,7 @@ describe("IntervalsClient controlled writes", () => {
         type: "Run",
       }),
     ]);
+    expect(JSON.stringify(body)).not.toContain('"external_id":"week1-easy-run"');
     expect(JSON.stringify(body)).not.toContain("fixture-secret");
   });
 });
