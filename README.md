@@ -47,6 +47,18 @@ npm run deploy:demo
 
 Sans compte Cloudflare authentifié, `npm run deploy:temporary` crée une prévisualisation réclamable. Cette URL est adaptée à une démonstration, pas à un hébergement durable. Ne jamais remplacer `DATA_SOURCE=fixtures` par `intervals` dans l’environnement public avant d’avoir implémenté et testé l’authentification du jalon B.
 
+### Worker live verrouillé
+
+L’environnement `live` cible un Worker distinct nommé `athlete-intelligence-live`. Il utilise `DATA_SOURCE=intervals` et `NODE_ENV=production` ; dans l’état actuel du jalon B, ses routes de données restent donc volontairement fermées avec `503 PRODUCTION_AUTH_NOT_CONFIGURED` :
+
+```bash
+npm run deploy:live
+npx wrangler secret put INTERVALS_API_KEY --env live
+npx wrangler secret put INTERVALS_ATHLETE_ID --env live
+```
+
+Les secrets doivent être créés avec `wrangler secret` et jamais comme variables texte dans le dashboard Cloudflare. Le Worker live ne doit être ouvert qu’après activation de Cloudflare Access et validation de l’autorisation MCP OAuth 2.1.
+
 ## Prérequis et installation
 
 - Node.js 20 ou plus récent ;

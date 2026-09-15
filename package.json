@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "build": "wrangler deploy --dry-run --outdir dist --env=\"\"",
     "deploy:demo": "wrangler deploy --env demo",
+    "deploy:live": "wrangler deploy --env live",
     "deploy:temporary": "wrangler deploy --env demo --temporary"
   },
   "dependencies": {

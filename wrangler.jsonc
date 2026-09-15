@@ -22,6 +22,18 @@
         "MAX_HISTORY_DAYS": "42",
         "NODE_ENV": "development"
       }
+    },
+    "live": {
+      "name": "athlete-intelligence-live",
+      "secrets": {
+        "required": ["INTERVALS_API_KEY", "INTERVALS_ATHLETE_ID"]
+      },
+      "vars": {
+        "DATA_SOURCE": "intervals",
+        "DEFAULT_TIMEZONE": "Europe/Paris",
+        "MAX_HISTORY_DAYS": "42",
+        "NODE_ENV": "production"
+      }
     }
   }
 }
