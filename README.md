@@ -143,15 +143,39 @@ confirmation utilisateur
 
 Chaque séance créée par le connecteur possède un `managedId` stable. Une adaptation ou un déplacement réutilise cet identifiant ; une séance sans le préfixe privé `athlete-ai:` ne peut pas être écrasée par l'upsert. Plusieurs séances gérées peuvent coexister sur les 5 à 7 prochains jours.
 
-Les blocs structurés de `publish_training_plan` sont sérialisés au format natif du Workout Builder. Un bloc répété est notamment envoyé sous cette forme, sans indentation :
+Les séances course, vélo et musculation publiées par `publish_training_plan` doivent fournir des `blocks` structurés. Le connecteur place chaque consigne **avant** la durée : Intervals.icu l'exporte alors comme description de l'étape vers les appareils Garmin compatibles. Les répétitions ne sont jamais imbriquées et leurs étapes restent contiguës, sans ligne vide ni indentation :
 
 ```text
-4x
-- 5m seated, cadence 55-60rpm, RPE 6/10
-- 3m easy, cadence 90-95rpm
+Force endurance 4x
+- Force assis RPE 6/10 5m 80-85% 55-60rpm intensity=interval
+- Pedalage souple 3m 50-55% 90-95rpm intensity=recovery
 ```
 
-Après l'écriture, le connecteur relit l'événement et compare sa durée `workout_doc` à la durée attendue avec une tolérance d'une minute. Le résultat contient `verified`, `parsedDurationMinutes` et `durationDeltaMinutes`. En cas de `WORKOUT_DURATION_MISMATCH` ou de durée indisponible, la décision reste `ACCEPTED`, la vérification est persistée et elle ne passe pas silencieusement à `PUBLISHED`.
+Exemple course :
+
+```text
+Warmup
+- Footing facile 10m Z2 HR intensity=warmup
+
+Seuil 3x
+- Allure controlee 5m 95-100% Pace intensity=interval
+- Trot souple 2m Z1 HR intensity=recovery
+
+Cooldown
+- Retour au calme 8m Z1 HR intensity=cooldown
+```
+
+Exemple musculation compatible avec le transfert Intervals.icu → Garmin :
+
+```text
+Circuit jambes 3x
+- Goblet squat dix repetitions RPE 7/10 45s intensity=interval
+- Repos 30s intensity=rest
+```
+
+La musculation est volontairement publiée sous forme d'étapes **chronométrées avec consignes visibles**. L'interface texte d'Intervals.icu ne garantit pas la traduction des noms d'exercices, poids et nombres de répétitions vers les champs natifs du catalogue Garmin ; ces informations restent donc dans la consigne affichée. Les cibles machine sont limitées à une cible principale par étape (`power`, `heartRate`, `pace` ou `freeride`), avec une cadence secondaire éventuelle. `pace` est réservé à la course et `freeride` au vélo.
+
+Après l'écriture, le connecteur relit l'événement et compare sa durée `workout_doc` à la durée attendue avec une tolérance d'une minute. Le résultat contient `verified`, `parsedDurationMinutes`, `durationDeltaMinutes`, `structured` et `garminReady`. `garminReady` n'est vrai que si des blocs structurés ont été envoyés et que la durée relue correspond. En cas de `WORKOUT_DURATION_MISMATCH` ou de durée indisponible, la décision reste `ACCEPTED`, la vérification est persistée et elle ne passe pas silencieusement à `PUBLISHED`.
 
 Chaque appel MCP à `publish_training_plan` produit également une entrée immuable dans `intervals_write_audit` : `managedId`, opération `CREATE` ou `UPDATE`, durée envoyée, durée analysée après relecture, appelant, horodatage, résultat et éventuel `decisionId`. Les dix dernières écritures associées à une séance sont visibles dans `get_workout_detail.writeAudit`. Cela permet d'identifier une écriture ultérieure sans dépendre des logs éphémères du Worker.
 

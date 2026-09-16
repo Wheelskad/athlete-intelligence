@@ -153,6 +153,11 @@ export class TrainingRuntimeService {
       ? undefined
       : await this.contextService.getManagedPlannedWorkout(managedId, managed.currentDate);
     const description = event?.description ?? managed.description ?? "";
+    const blocks = managed.blocks ?? parseIntervalsWorkout(description);
+    const parsedDurationMinutes = event?.parsedDurationMinutes ?? managed.parsedDurationMinutes;
+    const durationVerified = managed.expectedDurationMinutes !== undefined
+      && parsedDurationMinutes !== undefined
+      && Math.abs(parsedDurationMinutes - managed.expectedDurationMinutes) <= 1;
     return {
       managedId,
       ...(managed.currentDate === undefined ? {} : { date: managed.currentDate }),
@@ -166,7 +171,12 @@ export class TrainingRuntimeService {
       ...(event?.trainingLoad === undefined && managed.trainingLoad === undefined ? {} : { trainingLoad: event?.trainingLoad ?? managed.trainingLoad }),
       status: managed.status,
       source: "ATHLETE_INTELLIGENCE" as const,
-      blocks: managed.blocks ?? parseIntervalsWorkout(description),
+      blocks,
+      garminCompatibility: {
+        structured: blocks.length > 0,
+        durationVerified,
+        ready: blocks.length > 0 && durationVerified,
+      },
       publicationVerification: managed.publicationVerification,
       writeAudit: writeAudits.map((audit) => ({
         managedId: audit.managedId,

@@ -52,10 +52,21 @@ function normalizeWorkout(workout: ManagedPlannedWorkout): ManagedPlannedWorkout
   const calculatedDuration = workout.blocks === undefined
     ? undefined
     : workoutDurationSeconds(workout.blocks) / 60;
+  if (
+    calculatedDuration !== undefined
+    && workout.durationMinutes !== undefined
+    && Math.abs(calculatedDuration - workout.durationMinutes) > 1 / 60
+  ) {
+    throw new RangeError(
+      `Workout ${workout.managedId} durationMinutes must match its structured blocks (${String(calculatedDuration)} minutes)`,
+    );
+  }
   const expectedDurationMinutes = workout.durationMinutes ?? calculatedDuration;
   return {
     ...workout,
-    description: workout.blocks === undefined ? workout.description : serializeIntervalsWorkout(workout.blocks),
+    description: workout.blocks === undefined
+      ? workout.description
+      : serializeIntervalsWorkout(workout.blocks, { sport: workout.sport }),
     ...(expectedDurationMinutes === undefined ? {} : {
       durationMinutes: expectedDurationMinutes,
       expectedDurationMinutes,
@@ -80,6 +91,8 @@ export async function publishTrainingPlan(
     parsedDurationMinutes?: number;
     durationDeltaMinutes?: number;
     verified: boolean;
+    structured: boolean;
+    garminReady: boolean;
     warning?: PublicationVerification["warning"];
   }[];
   warning?: PublicationVerification["warning"];
@@ -113,7 +126,7 @@ export async function publishTrainingPlan(
     const proposal = decision.proposedWorkout;
     const proposedDescription = proposal.blocks === undefined
       ? proposal.description
-      : serializeIntervalsWorkout(proposal.blocks);
+      : serializeIntervalsWorkout(proposal.blocks, { sport: proposal.sport });
     const differs = accepted?.sport !== proposal.sport
       || accepted.title !== proposal.title
       || accepted.description.trim() !== proposedDescription.trim()
@@ -136,7 +149,15 @@ export async function publishTrainingPlan(
   const results = await Promise.all(normalized.map(async (workout) => {
     const readBack = await provider.getManagedPlannedWorkout(workout.managedId, workout.date);
     const verification = verifyWorkoutDuration(workout.expectedDurationMinutes, readBack?.parsedDurationMinutes);
-    return { managedId: workout.managedId, date: workout.date, sport: workout.sport, ...verification };
+    const structured = workout.blocks !== undefined;
+    return {
+      managedId: workout.managedId,
+      date: workout.date,
+      sport: workout.sport,
+      ...verification,
+      structured,
+      garminReady: structured && verification.verified,
+    };
   }));
   const verified = results.every((result) => result.verified);
   if (tracking !== undefined) {

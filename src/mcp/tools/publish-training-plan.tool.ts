@@ -18,21 +18,29 @@ const sportSchema = z.enum([
   "other",
 ]);
 
+const publishableWorkoutSchema = z.object({
+  managedId: z.string().regex(/^[a-z0-9][a-z0-9_-]{2,63}$/),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  sport: sportSchema,
+  title: z.string().trim().min(1).max(80),
+  description: z.string().trim().min(1).max(4_000),
+  durationMinutes: z.number().int().min(10).max(600).optional(),
+  trainingLoad: z.number().min(0).max(500).optional(),
+  blocks: workoutBlocksSchema.optional(),
+}).superRefine((workout, context) => {
+  if (workout.sport !== "other" && workout.blocks === undefined) {
+    context.addIssue({
+      code: "custom",
+      path: ["blocks"],
+      message: "Structured blocks are required for Garmin-compatible running, cycling and strength workouts",
+    });
+  }
+});
+
 export const publishTrainingPlanInputSchema = z.object({
   decisionId: z.uuid().optional(),
   workouts: z
-    .array(
-      z.object({
-        managedId: z.string().regex(/^[a-z0-9][a-z0-9_-]{2,63}$/),
-        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-        sport: sportSchema,
-        title: z.string().trim().min(1).max(80),
-        description: z.string().trim().min(1).max(4_000),
-        durationMinutes: z.number().int().min(10).max(600).optional(),
-        trainingLoad: z.number().min(0).max(500).optional(),
-        blocks: workoutBlocksSchema.optional(),
-      }),
-    )
+    .array(publishableWorkoutSchema)
     .min(1)
     .max(14),
   confirmed: z.literal(true),
@@ -50,7 +58,7 @@ export function registerPublishTrainingPlanTool(
     {
       title: "Publish confirmed workouts",
       description:
-        "Creates or updates only connector-managed workouts in the Intervals.icu calendar. Prefer structured blocks: the server serializes repeats to native Intervals.icu syntax and verifies interpreted duration after read-back. Reuse managedId to adapt an existing workout. For a saved coach proposal, pass decisionId; it must already be ACCEPTED and becomes PUBLISHED only after successful verification. Never call before showing exact changes and receiving explicit confirmation.",
+        "Creates or updates only connector-managed workouts in the Intervals.icu calendar. Structured blocks are required for Garmin-compatible running, cycling and strength workouts. Put a short watch-visible cue in every instruction; use intensity to distinguish work, recovery, warmup and cooldown. Repeats are serialized without nesting and interpreted duration is verified after read-back. Reuse managedId to adapt an existing workout. For a saved coach proposal, pass decisionId; it must already be ACCEPTED and becomes PUBLISHED only after successful verification. Never call before showing exact changes and receiving explicit confirmation.",
       inputSchema: publishTrainingPlanInputSchema,
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
       _meta: OAUTH_TOOL_META,

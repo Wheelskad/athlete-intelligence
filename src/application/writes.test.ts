@@ -25,6 +25,35 @@ describe("controlled writes", () => {
     }).success).toBe(false);
   });
 
+  it("requires structured blocks for Garmin-compatible sports", () => {
+    expect(publishTrainingPlanInputSchema.safeParse({
+      confirmed: true,
+      workouts: [{
+        managedId: "unstructured-run",
+        date: "2026-09-17",
+        sport: "running",
+        title: "Easy run",
+        description: "40 minutes easy",
+      }],
+    }).success).toBe(false);
+    expect(publishTrainingPlanInputSchema.safeParse({
+      confirmed: true,
+      workouts: [{
+        managedId: "structured-run",
+        date: "2026-09-17",
+        sport: "running",
+        title: "Easy run",
+        description: "40 minutes easy",
+        blocks: [{
+          type: "STEP",
+          durationSeconds: 2_400,
+          instruction: "Footing facile",
+          targets: { heartRate: "Z2" },
+        }],
+      }],
+    }).success).toBe(true);
+  });
+
   it("records today's check-in without changing unrelated wellness fields", async () => {
     const provider = FixtureProvider.anchoredAt("2026-09-14");
     await expect(
@@ -85,5 +114,18 @@ describe("controlled writes", () => {
     await expect(
       publishTrainingPlan(provider, [{ ...workout, date: "2027-01-01" }], options),
     ).rejects.toThrow("Workout dates must be between");
+  });
+
+  it("rejects a calendar duration that differs from the structured blocks", async () => {
+    const provider = FixtureProvider.anchoredAt("2026-09-14");
+    await expect(publishTrainingPlan(provider, [{
+      managedId: "bad-structured-duration",
+      date: "2026-09-17",
+      sport: "running",
+      title: "Bad duration",
+      description: "Structured workout",
+      durationMinutes: 55,
+      blocks: [{ type: "STEP", durationSeconds: 31 * 60, instruction: "Footing" }],
+    }], options)).rejects.toThrow("must match its structured blocks (31 minutes)");
   });
 });

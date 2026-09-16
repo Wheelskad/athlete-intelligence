@@ -86,6 +86,28 @@ describe("IntervalsClient controlled writes", () => {
     });
   });
 
+  it("does not mistake calendar duration for a parsed structured workout", async () => {
+    const fetchImpl = vi.fn<typeof fetch>(() => Promise.resolve(Response.json([{
+      id: 124,
+      start_date_local: "2026-09-17T00:00:00",
+      category: "WORKOUT",
+      type: "Run",
+      external_id: "athlete-ai:unparsed-run",
+      name: "Unparsed run",
+      description: "calendar note only",
+      moving_time: 2_400,
+    }])));
+    const client = new IntervalsClient({
+      apiKey: "fixture-secret",
+      athleteId: "0",
+      maxHistoryDays: 42,
+      fetchImpl,
+    });
+    const workout = await client.getManagedPlannedWorkout("unparsed-run", "2026-09-17");
+    expect(workout?.durationMinutes).toBe(40);
+    expect(workout?.parsedDurationMinutes).toBeUndefined();
+  });
+
   it("updates only the selected wellness fields for today's date", async () => {
     const fetchImpl = vi.fn<typeof fetch>(() =>
       Promise.resolve(new Response(null, { status: 204 })),

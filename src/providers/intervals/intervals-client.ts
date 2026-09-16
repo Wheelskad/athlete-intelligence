@@ -251,7 +251,9 @@ export class IntervalsClient implements AthleteDataProvider {
   private mapEvent(event: IntervalsEvent): PlannedEvent {
     const managed = event.external_id?.startsWith(MANAGED_EVENT_PREFIX) === true;
     const managedId = managed ? event.external_id?.slice(MANAGED_EVENT_PREFIX.length) : undefined;
-    const parsedSeconds = event.workout_doc?.duration ?? event.moving_time;
+    // Do not fall back to the calendar duration here. A matching moving_time
+    // does not prove that Intervals parsed the structured steps for Garmin.
+    const parsedSeconds = event.workout_doc?.duration;
     return {
       date: event.start_date_local.slice(0, 10),
       category: event.category,
